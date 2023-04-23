@@ -2,6 +2,7 @@ import os
 import funcoes as f
 from datetime import datetime, timedelta
 
+
 vLocal = f'C:\\Temp\\Faturamento\\Processar\\04_2023\\'
 def abreFicha(pNome):
     with open(vLocal + pNome, 'r') as reader:
