@@ -3,6 +3,7 @@ import funcoes as f
 from datetime import datetime, timedelta
 from docxtpl import DocxTemplate
 import locale
+from docx2pdf import convert
 
 vLocal = f'C:\\Temp\\Faturamento\\Processar\\04_2023\\'
 template = DocxTemplate('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Template.docx')
@@ -85,12 +86,6 @@ def importaFicha(ficha, versao):
             #     valor = linha[82:107].replace(" ", "")
             #     amortizacoes.append(valor.replace(".", ""))
             # vlinha = vlinha + 1
-
-#arquivos = os.listdir(vLocal)
-
-#for arquivo in arquivos:
-    #abreFicha(arquivo)
-
 def geraRelatorio():
     db = f.conexao()
     cursor = db.cursor()
@@ -118,7 +113,7 @@ def geraRelatorio():
         rParcelas = cursor.fetchall()
         vParcelas = []
         for parcela in rParcelas:
-            vParcelas.append({"data":parcela[0],"historico":parcela[1], "valor":moeda(parcela[2])})
+            vParcelas.append({"data":parcela[0].strftime("%d/%m/%Y") ,"historico":parcela[1], "valor":moeda(parcela[2])})
         if len(rParcelas) == 0:
             vParcelas.append({"data": "--", "historico": "Sem Lancamentos para este Título", "valor": "--"})
         titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas})
@@ -145,4 +140,12 @@ def geraRelatorio():
 
     template.render(context)
     template.save('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.docx')
+    convert("C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.docx",
+            "C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.pdf")
+
+arquivos = os.listdir(vLocal)
+
+for arquivo in arquivos:
+    abreFicha(arquivo)
+
 geraRelatorio()
