@@ -1,15 +1,21 @@
 import os
 import funcoes as f
 from datetime import datetime, timedelta
+from docxtpl import DocxTemplate
+import locale
 
 vLocal = f'C:\\Temp\\Faturamento\\Processar\\04_2023\\'
+template = DocxTemplate('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Template.docx')
 def abreFicha(pNome):
     with open(vLocal + pNome, 'r') as reader:
         ficha_grafica = reader.readlines()
         versao = identificaVersaoFicha(ficha_grafica)
         print(versao)
         importaFicha(ficha_grafica, versao)
-
+def moeda(valor):
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+    valor = locale.currency(valor, grouping=True, symbol=None)
+    return ('R$ %s' % valor)
 def identificaVersaoFicha(ficha):
     ## Identifica a Versão do Arquivo(Se é emitido pelo Sicredi ou da Cresol)
     vlinha = 1
@@ -80,7 +86,63 @@ def importaFicha(ficha, versao):
             #     amortizacoes.append(valor.replace(".", ""))
             # vlinha = vlinha + 1
 
-arquivos = os.listdir(vLocal)
+#arquivos = os.listdir(vLocal)
 
-for arquivo in arquivos:
-    abreFicha(arquivo)
+#for arquivo in arquivos:
+    #abreFicha(arquivo)
+
+def geraRelatorio():
+    db = f.conexao()
+    cursor = db.cursor()
+    sql = """
+            SELECT 
+                id,
+                titulo, 
+                associado, 
+                data_processamento
+            FROM fatura_titulos;
+		"""
+    cursor.execute(sql)
+    rTitulos = cursor.fetchall()
+
+    titulos = []
+    for titulo in rTitulos:
+        sql = """
+                SELECT 
+                    data_parcela, 
+                    historico, 
+                    valor 
+                FROM fatura_detalhe where fatura_titulo_id = %s
+        """
+        cursor.execute(sql, [titulo[0]])
+        rParcelas = cursor.fetchall()
+        vParcelas = []
+        for parcela in rParcelas:
+            vParcelas.append({"data":parcela[0],"historico":parcela[1], "valor":moeda(parcela[2])})
+        if len(rParcelas) == 0:
+            vParcelas.append({"data": "--", "historico": "Sem Lancamentos para este Título", "valor": "--"})
+        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas})
+    sql = """
+            SELECT 
+	            sum(valor) AS total_parcelas
+            FROM fatura_detalhe AS fd 
+	            INNER JOIN edersondallabr.fatura_titulos AS ft
+		            ON fd.fatura_titulo_id = ft.id
+            """
+    cursor.execute(sql)
+    rTotalParcelas = cursor.fetchone()
+    vTotalParcelas = rTotalParcelas[0]
+    vPercentualCobranca = 10
+    vTotalFatura = ((vTotalParcelas * vPercentualCobranca)/100) + vTotalParcelas
+    print([vTotalParcelas, vPercentualCobranca, vTotalFatura])
+    print(moeda(vTotalFatura))
+
+    context = {
+        "titulos": titulos,
+        "total_parcelas": moeda(vTotalParcelas),
+        "total_faturamento": moeda(vTotalFatura)
+    }
+
+    template.render(context)
+    template.save('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.docx')
+geraRelatorio()
