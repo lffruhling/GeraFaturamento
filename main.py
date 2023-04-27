@@ -5,6 +5,7 @@ from docxtpl import DocxTemplate
 import locale
 from docx2pdf import convert
 
+
 vLocal = f'C:\\Temp\\Faturamento\\Processar\\04_2023\\'
 template = DocxTemplate('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Template.docx')
 def abreFicha(pNome):
