@@ -33,6 +33,9 @@ from io import BytesIO
 import csv
 
 import util.constantes as cons
+import pdfplumber
+
+
 
 feriados = [date(2022,10,12), date(2022,11,2), date(2022,11,15), date(2022,12,25),
             date(2023,1,1), date(2023,12,25), date(2023,4,7), date(2023,4,21),
@@ -704,3 +707,27 @@ def geraQrCode(url):
 
     except Exception as e:
         Logs.error(e)
+
+
+def converterPDF(vPath, vArquivo):
+    try:
+        ## Carrega arquivo
+        pdf = pdfplumber.open(f'{vPath}{vArquivo}')
+        vArquivoTxt = str(f'{vPath}{vArquivo}').lower().replace("pdf", 'txt')
+        ## Converte PDF em TXT
+        for pagina in pdf.pages:
+            texto = pagina.extract_text(x_tolerance=1)
+            with open(vArquivoTxt, 'a') as arquivo_txt:
+                arquivo_txt.write(str(texto))
+            arquivo_txt.close()
+
+
+        pdf.close()
+
+        return True
+
+    except Exception as erro:
+        with open('c:\\Temp\\Logs\\ERRO_LOG.txt', 'a') as arquivo_txt:
+            arquivo_txt.write(str(erro))
+
+        return False

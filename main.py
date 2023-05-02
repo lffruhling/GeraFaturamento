@@ -1,4 +1,6 @@
 import os
+
+import constantes
 import funcoes as f
 from datetime import datetime, timedelta
 from docxtpl import DocxTemplate
@@ -12,12 +14,17 @@ vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
 vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
 vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
 
-def abreFicha(pNome):
+def abreFicha(pNome, isTXT=False):
     with open(vLocalProcessar + pNome, 'r') as reader:
-        ficha_grafica = reader.readlines()
-        versao = identificaVersaoFicha(ficha_grafica)
-        importaFicha(ficha_grafica, versao)
-        # ficha_grafica.close()
+        if not isTXT:
+            ficha_grafica = reader.readlines()
+            versao = identificaVersaoFicha(ficha_grafica)
+            importaFicha(ficha_grafica, versao)
+            # ficha_grafica.close()
+        else:
+            versao = identificaVersaoFicha(reader)
+            importaFicha(reader,versao)
+
         return versao
 
 def moeda(valor):
@@ -29,17 +36,49 @@ def identificaVersaoFicha(ficha):
     vlinha = 1
 
     for linha in ficha:
-        if (vlinha == 5):
-            if ("RAIZES" in linha):
-                versao = 'raizes'
-            else:
-                versao = 'cresol'
+        if (vlinha <= 20):
+            if ("COOP CRED POUP E INVEST RAIZES" in linha):
+                return 'sicredi_raizes'
+            elif ("CRESOL RAIZ" in linha):
+                return 'cresol_raizes'
 
-            return versao
         vlinha = vlinha + 1
 
+def insereTitulo(versao, titulo, associado):
+    db = f.conexao()
+    cursor = db.cursor()
+
+    vTitulo = str(titulo).strip()
+
+    cursor.execute('SELECT id FROM fatura_titulos where titulo_contrato=%s AND versao=%s;',
+                   [vTitulo, versao])
+    result = cursor.fetchone()
+
+    if result is None:
+        cursor.execute(
+            'INSERT INTO fatura_titulos (titulo_contrato, versao, associado, data_processamento) VALUE (%s,%s,%s, now())',
+            [vTitulo, versao, associado.rstrip()])
+        fTituloId = db.insert_id()
+
+    else:
+        cursor.execute(
+            "UPDATE fatura_titulos SET titulo_contrato=%s, versao=%s, associado=%s, data_processamento=%s  WHERE id=%s",
+            [vTitulo, versao, associado.rstrip(), datetime.now(), result[0]])
+        fTituloId = result[0]
+
+        # Limpa tabela de parcelas
+        cursor.execute('DELETE FROM fatura_parcelas WHERE fatura_titulo_id=%s', [fTituloId])
+
+    db.commit()
+    cursor.close()
+    db.close()
+
+    return fTituloId
+
 def importaFicha(ficha, versao):
-    if versao == 'raizes':
+    vFinalVigencia = datetime.today()
+    vInicioVigencia = datetime.today() - timedelta(days=30)
+    if versao == 'sicredi_raizes':
         for linha in ficha:
             if ("TITULO") in linha:
                 vTitulo = linha[122:135]
@@ -50,33 +89,10 @@ def importaFicha(ficha, versao):
                 vAssociado = linha[16:57]
                 break
 
+        fTituloId = insereTitulo(versao, vTitulo, vAssociado)
+
         db = f.conexao()
         cursor = db.cursor()
-
-        vTitulo = str(vTitulo).strip()
-
-        cursor.execute('SELECT id FROM edersondallabr.fatura_titulos where titulo=%s AND versao=%s;', [vTitulo, versao])
-        result = cursor.fetchone()
-
-        if result is None:
-            cursor.execute(
-                'INSERT INTO fatura_titulos (titulo, versao, associado, data_processamento) VALUE (%s,%s,%s, now())',
-                [vTitulo, versao, vAssociado.rstrip()])
-            fTituloId = db.insert_id()
-
-        else:
-            cursor.execute(
-                "UPDATE fatura_titulos SET titulo=%s, versao=%s, associado=%s, data_processamento=%s  WHERE id=%s",
-                [vTitulo, versao, vAssociado.rstrip(), datetime.now(), result[0]])
-            fTituloId = result[0]
-
-            #Limpa tabela de parcelas
-            cursor.execute('DELETE FROM fatura_parcelas WHERE fatura_titulo_id=%s', [fTituloId])
-
-        db.commit()
-
-        vFinalVigencia = datetime.today()
-        vInicioVigencia = datetime.today() - timedelta(days=30)
         for linha in ficha:
             if(len(str(linha[0:10]).split("/")) == 3):
                 vDataParcela    = linha[0:10]
@@ -100,11 +116,91 @@ def importaFicha(ficha, versao):
                     cursor.execute("INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
                                    [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
 
-                    print(db.insert_id())
-                    db.commit()
+                    # print(db.insert_id())
+        db.commit()
         cursor.close()
         db.close()
+    elif versao == 'cresol_raizes':
+        for linha in ficha:
+            if ("Contrato:") in linha:
+                vTitulo = linha[10:40]
+                break
 
+        for linha in ficha:
+            if ("Nome:") in linha:
+                vAssociado = linha[7:len(linha)]
+                break
+        fTituloId = insereTitulo(versao, vTitulo, vAssociado)
+
+        db = f.conexao()
+        cursor = db.cursor()
+
+        for linha in ficha:
+
+            if(len(str(linha[13:25]).split("/")) == 3):
+                vParcela = linha[0:2]
+                linhaData = linha[13:23]
+                linhaCod = linha[24:28]
+                linhaHistorico = linha[29:len(linha)]
+                linhaValor = linha[50:len(linha)]
+
+                try:
+                    iParcela = int(vParcela)
+                except Exception:
+                    print('Não é parcela')
+                    iParcela = 0
+
+                if (iParcela >= 10 and iParcela <= 99):
+                    linhaData = linha[14:24]
+                    linhaCod = linha[25:29]
+                    linhaHistorico = linha[30:len(linha)]
+                    linhaValor = linha[51:len(linha)]
+
+                elif (iParcela >= 100):
+                    linhaData = linha[15:25]
+                    linhaCod = linha[16:26]
+                    linhaHistorico = linha[31:len(linha)]
+                    linhaValor = linha[52:len(linha)]
+
+                vDataParcela = linhaData
+
+                if ':' in vDataParcela:
+                    continue
+                print(vDataParcela)
+                dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
+                print(f'Maior que data de inicio: {(dtDataParcela > vInicioVigencia)}')
+                print(f'Maior que data de Final: {(dtDataParcela > vFinalVigencia)}')
+                print('-------------------------------------------')
+                if (dtDataParcela > vInicioVigencia) and (dtDataParcela > vFinalVigencia):
+                    #Caso uma delas esteja fora do intervalo não deixa adicionar
+                    continue
+                elif not (dtDataParcela > vInicioVigencia) and not (dtDataParcela > vFinalVigencia):
+                    #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
+                    continue
+
+                vCod = linhaCod
+                vHistorico = linhaHistorico
+                vHistoricoArray = vHistorico.split(",")
+                vHistorico = vHistoricoArray[0]
+                for char, replacement in constantes.NUMEROS:
+                    if char in vHistorico:
+                        vHistorico = vHistorico.replace(char, replacement)
+
+                if ("AMORTIZAÇÃO") in vHistorico or ("LIQUIDACAO DE PARCELA") in vHistorico or ("LIQUIDACAO DE TITULO") in vHistorico:
+
+                    vValor = linhaValor
+                    vValorArray = vValor.split(",")
+                    vValor = vValorArray[0] + "," + vValorArray[1]
+                    for char, replacement in constantes.ALFABETO:
+                        if char in vValor:
+                            vValor = vValor.replace(char, replacement)
+
+                    cursor.execute(
+                        "INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
+                        [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
+        db.commit()
+        cursor.close()
+        db.close()
 def moveFicha(vNomeArquivo, versao):
     #verificar se Existe Diretório
     #'%m_%Y'
@@ -119,7 +215,7 @@ def geraRelatorio():
     sql = """
             SELECT 
                 id,
-                titulo, 
+                titulo_contrato, 
                 associado, 
                 data_processamento
             FROM fatura_titulos;
@@ -174,14 +270,24 @@ def geraRelatorio():
     convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
     os.remove(arquivoDoc)
 
+def main():
+    arquivos = os.listdir(vLocalProcessar)
 
-arquivos = os.listdir(vLocalProcessar)
+    if(len(arquivos) > 0):
+        for arquivo in arquivos:
+            vTipoArquivo = arquivo.split(".")[-1]
+            if vTipoArquivo.upper() == 'PRN':
+                versao = abreFicha(arquivo)
+                moveFicha(arquivo, versao)
+            elif vTipoArquivo.upper() == 'PDF':
+                utils_f.converterPDF(vLocalProcessar, arquivo)
+                versao = abreFicha(str(arquivo).lower().replace("pdf",'txt'), True)
+                moveFicha(arquivo, versao) #Move PDF
+                moveFicha(str(arquivo).lower().replace("pdf",'txt'), versao) #Move TXT
 
-if(len(arquivos) > 0):
-    for arquivo in arquivos:
-        versao = abreFicha(arquivo)
-        moveFicha(arquivo, versao)
 
-    geraRelatorio()
-else:
-    print('Sem arquivos para processar!')
+        geraRelatorio()
+    else:
+        print('Sem arquivos para processar!')
+
+main()
