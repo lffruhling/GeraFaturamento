@@ -81,8 +81,14 @@ def importaFicha(ficha, versao):
             if(len(str(linha[0:10]).split("/")) == 3):
                 vDataParcela    = linha[0:10]
                 dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
-
+                # print(f'Maior que data de inicio: {(dtDataParcela > vInicioVigencia)}')
+                # print(f'Maior que data de Final: {(dtDataParcela > vFinalVigencia)}')
+                # print('-------------------------------------------')
                 if (dtDataParcela > vInicioVigencia) and (dtDataParcela > vFinalVigencia):
+                    #Caso uma delas esteja fora do intervalo não deixa adicionar
+                    continue
+                elif not (dtDataParcela > vInicioVigencia) and not (dtDataParcela > vFinalVigencia):
+                    #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
                     continue
 
                 vCod            = linha[12:15]
