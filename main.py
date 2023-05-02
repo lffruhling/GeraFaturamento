@@ -4,16 +4,22 @@ from datetime import datetime, timedelta
 from docxtpl import DocxTemplate
 import locale
 from docx2pdf import convert
+import shutil
 
+import util.funcoes as utils_f
 
-vLocal = f'C:\\Temp\\Faturamento\\Processar\\04_2023\\'
-template = DocxTemplate('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Template.docx')
+vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
+vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
+vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
+
 def abreFicha(pNome):
-    with open(vLocal + pNome, 'r') as reader:
+    with open(vLocalProcessar + pNome, 'r') as reader:
         ficha_grafica = reader.readlines()
         versao = identificaVersaoFicha(ficha_grafica)
-        print(versao)
         importaFicha(ficha_grafica, versao)
+        # ficha_grafica.close()
+        return versao
+
 def moeda(valor):
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     valor = locale.currency(valor, grouping=True, symbol=None)
@@ -34,8 +40,6 @@ def identificaVersaoFicha(ficha):
 
 def importaFicha(ficha, versao):
     if versao == 'raizes':
-        vlinha = 1
-
         for linha in ficha:
             if ("TITULO") in linha:
                 vTitulo = linha[122:135]
@@ -48,23 +52,35 @@ def importaFicha(ficha, versao):
 
         db = f.conexao()
         cursor = db.cursor()
-        cursor.execute(
-            'INSERT INTO fatura_titulos (titulo, versao, associado, data_processamento) VALUE (%s,%s,%s, now())',
-            [vTitulo, versao, vAssociado.rstrip()])
 
+        vTitulo = str(vTitulo).strip()
 
-        fTituloId = db.insert_id()
+        cursor.execute('SELECT id FROM edersondallabr.fatura_titulos where titulo=%s AND versao=%s;', [vTitulo, versao])
+        result = cursor.fetchone()
+
+        if result is None:
+            cursor.execute(
+                'INSERT INTO fatura_titulos (titulo, versao, associado, data_processamento) VALUE (%s,%s,%s, now())',
+                [vTitulo, versao, vAssociado.rstrip()])
+            fTituloId = db.insert_id()
+
+        else:
+            cursor.execute(
+                "UPDATE fatura_titulos SET titulo=%s, versao=%s, associado=%s, data_processamento=%s  WHERE id=%s",
+                [vTitulo, versao, vAssociado.rstrip(), datetime.now(), result[0]])
+            fTituloId = result[0]
+
+            #Limpa tabela de parcelas
+            cursor.execute('DELETE FROM fatura_parcelas WHERE fatura_titulo_id=%s', [fTituloId])
+
         db.commit()
 
-        print(fTituloId)
         vFinalVigencia = datetime.today()
         vInicioVigencia = datetime.today() - timedelta(days=30)
         for linha in ficha:
             if(len(str(linha[0:10]).split("/")) == 3):
                 vDataParcela    = linha[0:10]
                 dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
-                print("d1 is greater than d2 : ", dtDataParcela < vInicioVigencia)
-                print("d1 is less than d2 : ", dtDataParcela < vFinalVigencia)
 
                 if (dtDataParcela > vInicioVigencia) and (dtDataParcela > vFinalVigencia):
                     continue
@@ -75,18 +91,22 @@ def importaFicha(ficha, versao):
                     vParcela        = linha[59:63]
                     vValor          = linha[90:106]
 
-                    cursor.execute("INSERT INTO fatura_detalhe (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
+                    cursor.execute("INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
                                    [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
 
                     print(db.insert_id())
                     db.commit()
         cursor.close()
         db.close()
-            # if (("AMORTIZACAO DE PARCELA" in linha) or ("LIQUIDACAO DE PARCELA" in linha) or (
-            #         "LIQUIDACAO DE TITULO" in linha)):
-            #     valor = linha[82:107].replace(" ", "")
-            #     amortizacoes.append(valor.replace(".", ""))
-            # vlinha = vlinha + 1
+
+def moveFicha(vNomeArquivo, versao):
+    #verificar se Existe Diretório
+    #'%m_%Y'
+    vVigencia = datetime.now().strftime('%m_%Y')
+    vMoverPara = f'{vLocalProcessados}{vVigencia}\\{versao}'
+    utils_f.pastaExiste(vMoverPara, True)
+    shutil.move(vLocalProcessar + vNomeArquivo, f'{vMoverPara}\\{vNomeArquivo}')
+
 def geraRelatorio():
     db = f.conexao()
     cursor = db.cursor()
@@ -108,7 +128,7 @@ def geraRelatorio():
                     data_parcela, 
                     historico, 
                     valor 
-                FROM fatura_detalhe where fatura_titulo_id = %s
+                FROM fatura_parcelas where fatura_titulo_id = %s
         """
         cursor.execute(sql, [titulo[0]])
         rParcelas = cursor.fetchall()
@@ -121,7 +141,7 @@ def geraRelatorio():
     sql = """
             SELECT 
 	            sum(valor) AS total_parcelas
-            FROM fatura_detalhe AS fd 
+            FROM fatura_parcelas AS fd 
 	            INNER JOIN edersondallabr.fatura_titulos AS ft
 		            ON fd.fatura_titulo_id = ft.id
             """
@@ -130,23 +150,32 @@ def geraRelatorio():
     vTotalParcelas = rTotalParcelas[0]
     vPercentualCobranca = 10
     vTotalFatura = ((vTotalParcelas * vPercentualCobranca)/100) + vTotalParcelas
-    print([vTotalParcelas, vPercentualCobranca, vTotalFatura])
-    print(moeda(vTotalFatura))
 
     context = {
         "titulos": titulos,
         "total_parcelas": moeda(vTotalParcelas),
         "total_faturamento": moeda(vTotalFatura)
     }
-
+    template = DocxTemplate('C:\\Temp\\Faturamento\\Template.docx')
     template.render(context)
-    template.save('C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.docx')
-    convert("C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.docx",
-            "C:\\Users\\lffru\\PycharmProjects\\GeraFaturas\\relatorios\\Fatura-ok.pdf")
+    vDataHora = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
+    vData =datetime.now().strftime('%m_%Y')
+    vNomeArquivo = f'fatura_{vDataHora}'
+    vPathArquivo = f'{vLocalRelatorios}{vData}\\'
+    utils_f.pastaExiste(f'{vPathArquivo}', True)
+    arquivoDoc = f"{vPathArquivo}{vNomeArquivo}.docx"
+    template.save(arquivoDoc)
+    convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
+    os.remove(arquivoDoc)
 
-arquivos = os.listdir(vLocal)
 
-for arquivo in arquivos:
-    abreFicha(arquivo)
+arquivos = os.listdir(vLocalProcessar)
 
-geraRelatorio()
+if(len(arquivos) > 0):
+    for arquivo in arquivos:
+        versao = abreFicha(arquivo)
+        moveFicha(arquivo, versao)
+
+    geraRelatorio()
+else:
+    print('Sem arquivos para processar!')
