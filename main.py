@@ -13,6 +13,12 @@ import util.funcoes as utils_f
 vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
 vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
 vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
+array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/','11/','12/',
+                    '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
+                    '25/','26/','27/','28/','29/','30/','31/']
+
+vFinalVigencia  = datetime(2023, 4, 20)
+vInicioVigencia = datetime(2023, 3, 20)
 
 def abreFicha(pNome, isTXT=False):
     with open(vLocalProcessar + pNome, 'r') as reader:
@@ -23,7 +29,7 @@ def abreFicha(pNome, isTXT=False):
             # ficha_grafica.close()
         else:
             versao = identificaVersaoFicha(reader)
-            importaFicha(reader,versao)
+            importaFicha(reader, versao)
 
         return versao
 
@@ -76,8 +82,12 @@ def insereTitulo(versao, titulo, associado):
     return fTituloId
 
 def importaFicha(ficha, versao):
-    vFinalVigencia = datetime.today()
-    vInicioVigencia = datetime.today() - timedelta(days=30)
+    # vFinalVigencia = datetime.today()
+    # vInicioVigencia = datetime.today() - timedelta(days=30)
+    global vFinalVigencia
+    global vInicioVigencia
+
+
     if versao == 'sicredi_raizes':
         for linha in ficha:
             if ("TITULO") in linha:
@@ -122,14 +132,15 @@ def importaFicha(ficha, versao):
         db.close()
     elif versao == 'cresol_raizes':
         for linha in ficha:
+            if ("Nome:") in linha:
+                vAssociado = linha[6:len(linha)]
+                break
+
+        for linha in ficha:
             if ("Contrato:") in linha:
                 vTitulo = linha[10:40]
                 break
 
-        for linha in ficha:
-            if ("Nome:") in linha:
-                vAssociado = linha[7:len(linha)]
-                break
         fTituloId = insereTitulo(versao, vTitulo, vAssociado)
 
         db = f.conexao()
@@ -137,67 +148,62 @@ def importaFicha(ficha, versao):
 
         for linha in ficha:
 
-            if(len(str(linha[13:25]).split("/")) == 3):
-                vParcela = linha[0:2]
-                linhaData = linha[13:23]
-                linhaCod = linha[24:28]
-                linhaHistorico = linha[29:len(linha)]
-                linhaValor = linha[50:len(linha)]
+            ## Divide a linha em um array de 4 partes
+            linha_atual = linha.split(" ", 4)
 
-                try:
-                    iParcela = int(vParcela)
-                except Exception:
-                    print('Não é parcela')
-                    iParcela = 0
+            vLinhaLancamento = False
+            ## identifica se é uma linha de lançamento de movimentação
+            if (linha_atual[1][0:3] in array_datas):
+                vLinhaLancamento = True
+                ## Se for linha de lançamento, captura as informações
 
-                if (iParcela >= 10 and iParcela <= 99):
-                    linhaData = linha[14:24]
-                    linhaCod = linha[25:29]
-                    linhaHistorico = linha[30:len(linha)]
-                    linhaValor = linha[51:len(linha)]
+            if vLinhaLancamento:
+                descricao = ''
+                parcela = int(linha_atual[0])
 
-                elif (iParcela >= 100):
-                    linhaData = linha[15:25]
-                    linhaCod = linha[16:26]
-                    linhaHistorico = linha[31:len(linha)]
-                    linhaValor = linha[52:len(linha)]
+                data_m = linha_atual[2].split('/')
+                dia_m = data_m[0]
+                mes_m = data_m[1]
+                ano_m = data_m[2]
+                data_movimento = datetime(int(ano_m), int(mes_m), int(dia_m))
 
-                vDataParcela = linhaData
+                operacao = int(linha_atual[3])
 
-                if ':' in vDataParcela:
-                    continue
-                print(vDataParcela)
-                dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
-                print(f'Maior que data de inicio: {(dtDataParcela > vInicioVigencia)}')
-                print(f'Maior que data de Final: {(dtDataParcela > vFinalVigencia)}')
-                print('-------------------------------------------')
-                if (dtDataParcela > vInicioVigencia) and (dtDataParcela > vFinalVigencia):
+                ## Fatia o restante da string para montar a descrição, removendo os valores
+                texto = linha_atual[4].split(' ')
+                for posicao in texto:
+                    try:
+                        texto_ = posicao.replace('.', '')
+                        valor_capturado = float(texto_.replace(',', '.'))
+                    except:
+                        if descricao != '':
+                            descricao = descricao + ' ' + str(posicao)
+                        else:
+                            descricao = str(posicao)
+
+                descricao = descricao[:-2]
+
+                ## Cria variavel removendo o texto da descrição para sobrar apenas os valores para fatiar
+                string_valores = linha_atual[4].replace(descricao, "").split(' ')
+                # print(str(string_valores))
+
+                ## Captura valor, substitui virgulas por ponto, converte em float
+                str_valor = string_valores[0].replace('.', '')
+                str_valor = str_valor.replace(',', '.')
+                valor = float(str_valor)
+
+                if (data_movimento > vInicioVigencia) and (data_movimento > vFinalVigencia):
                     #Caso uma delas esteja fora do intervalo não deixa adicionar
                     continue
-                elif not (dtDataParcela > vInicioVigencia) and not (dtDataParcela > vFinalVigencia):
+                elif not (data_movimento > vInicioVigencia) and not (data_movimento > vFinalVigencia):
                     #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
                     continue
 
-                vCod = linhaCod
-                vHistorico = linhaHistorico
-                vHistoricoArray = vHistorico.split(",")
-                vHistorico = vHistoricoArray[0]
-                for char, replacement in constantes.NUMEROS:
-                    if char in vHistorico:
-                        vHistorico = vHistorico.replace(char, replacement)
-
-                if ("AMORTIZAÇÃO") in vHistorico or ("LIQUIDACAO DE PARCELA") in vHistorico or ("LIQUIDACAO DE TITULO") in vHistorico:
-
-                    vValor = linhaValor
-                    vValorArray = vValor.split(",")
-                    vValor = vValorArray[0] + "," + vValorArray[1]
-                    for char, replacement in constantes.ALFABETO:
-                        if char in vValor:
-                            vValor = vValor.replace(char, replacement)
+                if ("AMORTIZAÇÃO DO CAPITAL") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
 
                     cursor.execute(
                         "INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
-                        [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
+                        [fTituloId, data_movimento, operacao, descricao, parcela, valor])
         db.commit()
         cursor.close()
         db.close()
@@ -254,6 +260,9 @@ def geraRelatorio():
     vTotalFatura = ((vTotalParcelas * vPercentualCobranca)/100) + vTotalParcelas
 
     context = {
+        "inicio_vigencia": vInicioVigencia,
+        "final_vigencia": vFinalVigencia,
+        "versao": 'Cresol Raízes',
         "titulos": titulos,
         "total_parcelas": moeda(vTotalParcelas),
         "total_faturamento": moeda(vTotalFatura)
@@ -284,10 +293,10 @@ def main():
                 versao = abreFicha(str(arquivo).lower().replace("pdf",'txt'), True)
                 moveFicha(arquivo, versao) #Move PDF
                 moveFicha(str(arquivo).lower().replace("pdf",'txt'), versao) #Move TXT
-
-
-        geraRelatorio()
     else:
         print('Sem arquivos para processar!')
+
+    geraRelatorio()
+
 
 main()
