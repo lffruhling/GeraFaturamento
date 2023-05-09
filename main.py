@@ -17,8 +17,8 @@ array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
 
-vFinalVigencia  = datetime(2023, 4, 20)
-vInicioVigencia = datetime(2023, 3, 20)
+vInicioVigencia = datetime(2023, 3, 14)
+vFinalVigencia  = datetime(2023, 4, 24)
 
 def abreFicha(pNome, isTXT=False):
     with open(vLocalProcessar + pNome, 'r') as reader:
@@ -110,7 +110,7 @@ def importaFicha(ficha, versao):
                 # print(f'Maior que data de inicio: {(dtDataParcela > vInicioVigencia)}')
                 # print(f'Maior que data de Final: {(dtDataParcela > vFinalVigencia)}')
                 # print('-------------------------------------------')
-                if (dtDataParcela > vInicioVigencia) and (dtDataParcela > vFinalVigencia):
+                if (dtDataParcela >= vInicioVigencia) and (dtDataParcela >= vFinalVigencia):
                     #Caso uma delas esteja fora do intervalo não deixa adicionar
                     continue
                 elif not (dtDataParcela > vInicioVigencia) and not (dtDataParcela > vFinalVigencia):
@@ -192,14 +192,15 @@ def importaFicha(ficha, versao):
                 str_valor = str_valor.replace(',', '.')
                 valor = float(str_valor)
 
-                if (data_movimento > vInicioVigencia) and (data_movimento > vFinalVigencia):
+                if (data_movimento >= vInicioVigencia) and (data_movimento >= vFinalVigencia):
                     #Caso uma delas esteja fora do intervalo não deixa adicionar
                     continue
                 elif not (data_movimento > vInicioVigencia) and not (data_movimento > vFinalVigencia):
                     #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
                     continue
 
-                if ("AMORTIZAÇÃO DO CAPITAL") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
+                print(data_movimento)
+                if ("AMORTIZAÇÃO") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
 
                     cursor.execute(
                         "INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
@@ -208,8 +209,6 @@ def importaFicha(ficha, versao):
         cursor.close()
         db.close()
 def moveFicha(vNomeArquivo, versao):
-    #verificar se Existe Diretório
-    #'%m_%Y'
     vVigencia = datetime.now().strftime('%m_%Y')
     vMoverPara = f'{vLocalProcessados}{vVigencia}\\{versao}'
     utils_f.pastaExiste(vMoverPara, True)
@@ -224,7 +223,7 @@ def geraRelatorio():
                 titulo_contrato, 
                 associado, 
                 data_processamento
-            FROM fatura_titulos;
+            FROM fatura_titulos ORDER BY associado;
 		"""
     cursor.execute(sql)
     rTitulos = cursor.fetchall()
@@ -234,18 +233,22 @@ def geraRelatorio():
         sql = """
                 SELECT 
                     data_parcela, 
-                    historico, 
-                    valor 
+                    historico,
+                    valor,
+                    parcela 
                 FROM fatura_parcelas where fatura_titulo_id = %s
         """
         cursor.execute(sql, [titulo[0]])
         rParcelas = cursor.fetchall()
         vParcelas = []
+        vTotalValorParcelas = 0
         for parcela in rParcelas:
-            vParcelas.append({"data":parcela[0].strftime("%d/%m/%Y") ,"historico":parcela[1], "valor":moeda(parcela[2])})
+            vParcelas.append({"data": parcela[0].strftime("%d/%m/%Y"), "historico":parcela[1], "valor":moeda(parcela[2]),"parcela":parcela[3], "valor_faturado":moeda(parcela[2] / 10)})
+            vTotalValorParcelas += parcela[2]
         if len(rParcelas) == 0:
             vParcelas.append({"data": "--", "historico": "Sem Lancamentos para este Título", "valor": "--"})
-        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas})
+        vTotalFaturado = vTotalValorParcelas / 10
+        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas, "total_valor_parcela":moeda(vTotalValorParcelas), "total_faturado": moeda(vTotalFaturado)})
     sql = """
             SELECT 
 	            sum(valor) AS total_parcelas
@@ -257,7 +260,7 @@ def geraRelatorio():
     rTotalParcelas = cursor.fetchone()
     vTotalParcelas = rTotalParcelas[0]
     vPercentualCobranca = 10
-    vTotalFatura = ((vTotalParcelas * vPercentualCobranca)/100) + vTotalParcelas
+    vTotalFatura = ((vTotalParcelas * vPercentualCobranca)/100)
 
     context = {
         "inicio_vigencia": vInicioVigencia,
