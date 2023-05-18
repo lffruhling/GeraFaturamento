@@ -1,5 +1,7 @@
 import os
 
+from _ctypes import sizeof
+
 import constantes
 import funcoes as f
 from datetime import datetime, timedelta
@@ -10,6 +12,8 @@ import shutil
 
 import util.funcoes as utils_f
 
+import PySimpleGUI as sg
+
 vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
 vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
 vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
@@ -17,8 +21,10 @@ array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
 
-vInicioVigencia = datetime(2023, 3, 14)
-vFinalVigencia  = datetime(2023, 4, 24)
+#Variáveis Globais
+vFinalVigencia          = None
+vInicioVigencia         = None
+vPercentualFaturamento  = None
 
 def abreFicha(pNome, isTXT=False):
     with open(vLocalProcessar + pNome, 'r') as reader:
@@ -82,11 +88,8 @@ def insereTitulo(versao, titulo, associado):
     return fTituloId
 
 def importaFicha(ficha, versao):
-    # vFinalVigencia = datetime.today()
-    # vInicioVigencia = datetime.today() - timedelta(days=30)
     global vFinalVigencia
     global vInicioVigencia
-
 
     if versao == 'sicredi_raizes':
         for linha in ficha:
@@ -107,9 +110,6 @@ def importaFicha(ficha, versao):
             if(len(str(linha[0:10]).split("/")) == 3):
                 vDataParcela    = linha[0:10]
                 dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
-                # print(f'Maior que data de inicio: {(dtDataParcela > vInicioVigencia)}')
-                # print(f'Maior que data de Final: {(dtDataParcela > vFinalVigencia)}')
-                # print('-------------------------------------------')
                 if (dtDataParcela >= vInicioVigencia) and (dtDataParcela >= vFinalVigencia):
                     #Caso uma delas esteja fora do intervalo não deixa adicionar
                     continue
@@ -215,6 +215,10 @@ def moveFicha(vNomeArquivo, versao):
     shutil.move(vLocalProcessar + vNomeArquivo, f'{vMoverPara}\\{vNomeArquivo}')
 
 def geraRelatorio():
+    global vInicioVigencia
+    global vFinalVigencia
+    global vPercentualFaturamento
+
     db = f.conexao()
     cursor = db.cursor()
     sql = """
@@ -247,7 +251,7 @@ def geraRelatorio():
             vTotalValorParcelas += parcela[2]
         if len(rParcelas) == 0:
             vParcelas.append({"data": "--", "historico": "Sem Lancamentos para este Título", "valor": "--"})
-        vTotalFaturado = vTotalValorParcelas / 10
+        vTotalFaturado = (vTotalValorParcelas * float(vPercentualFaturamento)) / 100
         titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas, "total_valor_parcela":moeda(vTotalValorParcelas), "total_faturado": moeda(vTotalFaturado)})
     sql = """
             SELECT 
@@ -259,8 +263,7 @@ def geraRelatorio():
     cursor.execute(sql)
     rTotalParcelas = cursor.fetchone()
     vTotalParcelas = rTotalParcelas[0]
-    vPercentualCobranca = 10
-    vTotalFatura = ((vTotalParcelas * vPercentualCobranca)/100)
+    vTotalFatura = ((vTotalParcelas * float(vPercentualFaturamento))/100)
 
     context = {
         "inicio_vigencia": vInicioVigencia,
@@ -302,4 +305,49 @@ def main():
     geraRelatorio()
 
 
-main()
+def layout():
+    global vInicioVigencia
+    global vFinalVigencia
+    global vPercentualFaturamento
+
+    sg.theme('reddit')  # Add a touch of color
+    # All the stuff inside your window.
+    layout = [[sg.T('Fichas', size=10), sg.In(key='pathFichas',disabled=True), sg.FolderBrowse(button_text='Buscar', target='pathFichas')],
+              [sg.T('Vigência Inicial', size=17), sg.T('Vigência Final', size=18), sg.T('Percentual de Faturamento', size=25)],
+              [sg.InputText(key='dtIni', size=20), sg.In(key='dtFin', size=20),sg.In(key='percentualFat', size=25)],
+              [sg.Button(button_text='Cancelar',key='btnCancelar', size=12), sg.Button(button_text='Gerar Fatura', key='btnGeraFatura' ,size=12)]]
+
+    # Create the Window
+    window = sg.Window('Gerar Fechamento', layout)
+    # Event Loop to process "events" and get the "values" of the inputs
+    while True:
+        event, values = window.read()
+        if event == sg.WIN_CLOSED or event == 'btnCancelar':  # if user closes window or clicks cancel
+            break
+
+        vPercentualFaturamento = values['percentualFat']
+
+        if(len(str(values['pathFichas']).strip())):
+            arquivos = os.listdir(values['pathFichas'])
+            vInicioVigencia = datetime.strptime(values['dtIni'], '%d/%m/%Y')
+            vFinalVigencia = datetime.strptime(values['dtFin'], '%d/%m/%Y')
+
+            for arquivo in arquivos:
+                vTipoArquivo = arquivo.split(".")[-1]
+                if vTipoArquivo.upper() == 'PRN':
+                    versao = abreFicha(arquivo)
+                    moveFicha(arquivo, versao)
+                elif vTipoArquivo.upper() == 'PDF':
+                    utils_f.converterPDF(vLocalProcessar, arquivo)
+                    versao = abreFicha(str(arquivo).lower().replace("pdf", 'txt'), True)
+                    moveFicha(arquivo, versao)  # Move PDF
+                    moveFicha(str(arquivo).lower().replace("pdf", 'txt'), versao)  # Move TXT
+        else:
+            print('Sem arquivos para processar!')
+
+        geraRelatorio()
+
+
+    window.close()
+
+layout()
