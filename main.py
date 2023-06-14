@@ -53,7 +53,7 @@ def identificaCooperativa(ficha):
                 return constantes.SICREDI_RAIZES
             elif ("CRESOL RAIZ" in linha):
                 return constantes.CRESOL_RAIZ
-            elif ("INVEST CONEXAO" in linha):
+            elif ("INVESTIMENTO CONEXAO" in linha):
                 return constantes.SICREDI_CONEXAO
             elif ("CRESOL GERAÇÕES" in linha):
                 return constantes.CRESOL_GERACAO
