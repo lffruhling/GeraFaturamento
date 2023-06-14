@@ -20,7 +20,4 @@ pillow==9.4.0
 loguru==0.6.0
 wget==3.2
 PyQRCode==1.2.1
-
-
-
-
+PySimpleGUI==4.60.4

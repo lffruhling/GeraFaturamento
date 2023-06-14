@@ -43,3 +43,7 @@ ALFABETO = [
     ('W', ''),
     ('Z', ''),
 ]
+SICREDI_RAIZES='Sicredi Raizes'
+SICREDI_CONEXAO='Sicredi Conexão'
+CRESOL_RAIZ='Cresol Raizes'
+CRESOL_GERACAO='Cresol Gerações'

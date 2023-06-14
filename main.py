@@ -14,9 +14,9 @@ import util.funcoes as utils_f
 
 import PySimpleGUI as sg
 
-vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
-vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
-vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
+# vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
+# vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
+# vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
 array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/','11/','12/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
@@ -26,56 +26,63 @@ vFinalVigencia          = None
 vInicioVigencia         = None
 vPercentualFaturamento  = None
 
-def abreFicha(pNome, isTXT=False):
-    with open(vLocalProcessar + pNome, 'r') as reader:
+def abreFicha(arquivo, isTXT=False):
+    with open(arquivo, 'r') as reader:
         if not isTXT:
             ficha_grafica = reader.readlines()
-            versao = identificaVersaoFicha(ficha_grafica)
-            importaFicha(ficha_grafica, versao)
+            cooperativa = identificaCooperativa(ficha_grafica)
+            importaFicha(ficha_grafica, cooperativa)
             # ficha_grafica.close()
         else:
-            versao = identificaVersaoFicha(reader)
-            importaFicha(reader, versao)
+            cooperativa = identificaCooperativa(reader)
+            importaFicha(reader, cooperativa)
 
-        return versao
+        return cooperativa
 
 def moeda(valor):
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     valor = locale.currency(valor, grouping=True, symbol=None)
     return ('R$ %s' % valor)
-def identificaVersaoFicha(ficha):
+def identificaCooperativa(ficha):
     ## Identifica a Versão do Arquivo(Se é emitido pelo Sicredi ou da Cresol)
     vlinha = 1
 
     for linha in ficha:
         if (vlinha <= 20):
-            if ("COOP CRED POUP E INVEST RAIZES" in linha):
-                return 'sicredi_raizes'
+            if ("INVEST RAIZES" in linha):
+                return constantes.SICREDI_RAIZES
             elif ("CRESOL RAIZ" in linha):
-                return 'cresol_raizes'
+                return constantes.CRESOL_RAIZ
+            elif ("INVEST CONEXAO" in linha):
+                return constantes.SICREDI_CONEXAO
+            elif ("CRESOL GERAÇÕES" in linha):
+                return constantes.CRESOL_GERACAO
 
         vlinha = vlinha + 1
 
-def insereTitulo(versao, titulo, associado):
+def identificaAgenciaSicredi(titulo):
+    return titulo[2:4]
+def insereTitulo(cooperativa, titulo, associado):
     db = f.conexao()
     cursor = db.cursor()
 
     vTitulo = str(titulo).strip()
+    agencia = identificaAgenciaSicredi(vTitulo)
 
-    cursor.execute('SELECT id FROM fatura_titulos where titulo_contrato=%s AND versao=%s;',
-                   [vTitulo, versao])
+    cursor.execute('SELECT id FROM fatura_titulos where titulo_contrato=%s AND cooperativa=%s;',
+                   [vTitulo, cooperativa])
     result = cursor.fetchone()
 
     if result is None:
         cursor.execute(
-            'INSERT INTO fatura_titulos (titulo_contrato, versao, associado, data_processamento) VALUE (%s,%s,%s, now())',
-            [vTitulo, versao, associado.rstrip()])
+            'INSERT INTO fatura_titulos (titulo_contrato, cooperativa, agencia, associado, data_processamento) VALUE (%s,%s,%s,%s,now())',
+            [vTitulo, cooperativa, agencia, associado.rstrip()])
         fTituloId = db.insert_id()
 
     else:
         cursor.execute(
-            "UPDATE fatura_titulos SET titulo_contrato=%s, versao=%s, associado=%s, data_processamento=%s  WHERE id=%s",
-            [vTitulo, versao, associado.rstrip(), datetime.now(), result[0]])
+            "UPDATE fatura_titulos SET titulo_contrato=%s, cooperativa=%s, agencia=%s, associado=%s, data_processamento=%s  WHERE id=%s",
+            [vTitulo, cooperativa, agencia, associado.rstrip(), datetime.now(), result[0]])
         fTituloId = result[0]
 
         # Limpa tabela de parcelas
@@ -87,11 +94,11 @@ def insereTitulo(versao, titulo, associado):
 
     return fTituloId
 
-def importaFicha(ficha, versao):
+def importaFicha(ficha, cooperativa):
     global vFinalVigencia
     global vInicioVigencia
 
-    if versao == 'sicredi_raizes':
+    if cooperativa == constantes.SICREDI_RAIZES or cooperativa == constantes.SICREDI_CONEXAO:
         for linha in ficha:
             if ("TITULO") in linha:
                 vTitulo = linha[122:135]
@@ -102,7 +109,7 @@ def importaFicha(ficha, versao):
                 vAssociado = linha[16:57]
                 break
 
-        fTituloId = insereTitulo(versao, vTitulo, vAssociado)
+        fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
 
         db = f.conexao()
         cursor = db.cursor()
@@ -130,7 +137,7 @@ def importaFicha(ficha, versao):
         db.commit()
         cursor.close()
         db.close()
-    elif versao == 'cresol_raizes':
+    elif cooperativa == constantes.CRESOL_RAIZ or cooperativa == constantes.CRESOL_GERACAO:
         for linha in ficha:
             if ("Nome:") in linha:
                 vAssociado = linha[6:len(linha)]
@@ -141,7 +148,7 @@ def importaFicha(ficha, versao):
                 vTitulo = linha[10:40]
                 break
 
-        fTituloId = insereTitulo(versao, vTitulo, vAssociado)
+        fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
 
         db = f.conexao()
         cursor = db.cursor()
@@ -208,13 +215,13 @@ def importaFicha(ficha, versao):
         db.commit()
         cursor.close()
         db.close()
-def moveFicha(vNomeArquivo, versao):
+def moveFicha(vPath, vNomeArquivo, cooperativa):
     vVigencia = datetime.now().strftime('%m_%Y')
-    vMoverPara = f'{vLocalProcessados}{vVigencia}\\{versao}'
+    vMoverPara = f'{vPath}\\processados\\{vVigencia}\\{cooperativa}'
     utils_f.pastaExiste(vMoverPara, True)
-    shutil.move(vLocalProcessar + vNomeArquivo, f'{vMoverPara}\\{vNomeArquivo}')
+    shutil.move(f"{vPath}\\{vNomeArquivo}", f'{vMoverPara}\\{vNomeArquivo}')
 
-def geraRelatorio():
+def geraRelatorio(vPath):
     global vInicioVigencia
     global vFinalVigencia
     global vPercentualFaturamento
@@ -226,8 +233,10 @@ def geraRelatorio():
                 id,
                 titulo_contrato, 
                 associado, 
-                data_processamento
-            FROM fatura_titulos ORDER BY associado;
+                data_processamento,
+                cooperativa,
+                agencia
+            FROM fatura_titulos ORDER BY cooperativa, agencia, associado;
 		"""
     cursor.execute(sql)
     rTitulos = cursor.fetchall()
@@ -255,7 +264,7 @@ def geraRelatorio():
         titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas, "total_valor_parcela":moeda(vTotalValorParcelas), "total_faturado": moeda(vTotalFaturado)})
     sql = """
             SELECT 
-	            sum(valor) AS total_parcelas
+	            coalesce(sum(valor), 0) AS total_parcelas
             FROM fatura_parcelas AS fd 
 	            INNER JOIN edersondallabr.fatura_titulos AS ft
 		            ON fd.fatura_titulo_id = ft.id
@@ -263,12 +272,16 @@ def geraRelatorio():
     cursor.execute(sql)
     rTotalParcelas = cursor.fetchone()
     vTotalParcelas = rTotalParcelas[0]
-    vTotalFatura = ((vTotalParcelas * float(vPercentualFaturamento))/100)
+    if vTotalParcelas > 0:
+        vTotalFatura = ((vTotalParcelas * float(vPercentualFaturamento))/100)
+    else:
+        vTotalFatura = 0
+
 
     context = {
         "inicio_vigencia": vInicioVigencia,
         "final_vigencia": vFinalVigencia,
-        "versao": 'Cresol Raízes',
+        "cooperativa": 'Cresol Raízes',
         "titulos": titulos,
         "total_parcelas": moeda(vTotalParcelas),
         "total_faturamento": moeda(vTotalFatura)
@@ -278,32 +291,12 @@ def geraRelatorio():
     vDataHora = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
     vData =datetime.now().strftime('%m_%Y')
     vNomeArquivo = f'fatura_{vDataHora}'
-    vPathArquivo = f'{vLocalRelatorios}{vData}\\'
+    vPathArquivo = f'{vPath}/faturamento/{vData}\\'
     utils_f.pastaExiste(f'{vPathArquivo}', True)
     arquivoDoc = f"{vPathArquivo}{vNomeArquivo}.docx"
     template.save(arquivoDoc)
     convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
     os.remove(arquivoDoc)
-
-def main():
-    arquivos = os.listdir(vLocalProcessar)
-
-    if(len(arquivos) > 0):
-        for arquivo in arquivos:
-            vTipoArquivo = arquivo.split(".")[-1]
-            if vTipoArquivo.upper() == 'PRN':
-                versao = abreFicha(arquivo)
-                moveFicha(arquivo, versao)
-            elif vTipoArquivo.upper() == 'PDF':
-                utils_f.converterPDF(vLocalProcessar, arquivo)
-                versao = abreFicha(str(arquivo).lower().replace("pdf",'txt'), True)
-                moveFicha(arquivo, versao) #Move PDF
-                moveFicha(str(arquivo).lower().replace("pdf",'txt'), versao) #Move TXT
-    else:
-        print('Sem arquivos para processar!')
-
-    geraRelatorio()
-
 
 def layout():
     global vInicioVigencia
@@ -333,19 +326,22 @@ def layout():
             vFinalVigencia = datetime.strptime(values['dtFin'], '%d/%m/%Y')
 
             for arquivo in arquivos:
+                #Ignora diretório de arquivos processados
+                if ('faturamento' in arquivo) or ('processados' in arquivo):
+                    continue
                 vTipoArquivo = arquivo.split(".")[-1]
                 if vTipoArquivo.upper() == 'PRN':
-                    versao = abreFicha(arquivo)
-                    moveFicha(arquivo, versao)
+                    cooperativa = abreFicha(f"{values['pathFichas']}/{arquivo}")
+                    moveFicha(values['pathFichas'],arquivo, cooperativa)
                 elif vTipoArquivo.upper() == 'PDF':
-                    utils_f.converterPDF(vLocalProcessar, arquivo)
-                    versao = abreFicha(str(arquivo).lower().replace("pdf", 'txt'), True)
-                    moveFicha(arquivo, versao)  # Move PDF
-                    moveFicha(str(arquivo).lower().replace("pdf", 'txt'), versao)  # Move TXT
+                    utils_f.converterPDF(values['pathFichas'], arquivo)
+                    cooperativa = abreFicha(f"{values['pathFichas']}/"+str(arquivo).lower().replace("pdf", 'txt'), True)
+                    moveFicha(values['pathFichas'], arquivo, cooperativa)  # Move PDF
+                    moveFicha(values['pathFichas'], str(arquivo).lower().replace("pdf", 'txt'), cooperativa)  # Move TXT
         else:
             print('Sem arquivos para processar!')
 
-        geraRelatorio()
+        geraRelatorio(values['pathFichas'])
 
 
     window.close()
