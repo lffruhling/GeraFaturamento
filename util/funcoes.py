@@ -712,8 +712,8 @@ def geraQrCode(url):
 def converterPDF(vPath, vArquivo):
     try:
         ## Carrega arquivo
-        pdf = pdfplumber.open(f'{vPath}{vArquivo}')
-        vArquivoTxt = str(f'{vPath}{vArquivo}').lower().replace("pdf", 'txt')
+        pdf = pdfplumber.open(f'{vPath}/{vArquivo}')
+        vArquivoTxt = str(f'{vPath}/{vArquivo}').lower().replace("pdf", 'txt')
         ## Converte PDF em TXT
         for pagina in pdf.pages:
             texto = pagina.extract_text(x_tolerance=1)

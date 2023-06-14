@@ -156,7 +156,8 @@ def importaFicha(ficha, cooperativa):
         for linha in ficha:
 
             ## Divide a linha em um array de 4 partes
-            linha_atual = linha.split(" ", 4)
+            # linha_atual = linha.split(" ", 4)
+            linha_atual = linha.split(" ")
 
             vLinhaLancamento = False
             ## identifica se é uma linha de lançamento de movimentação
@@ -176,26 +177,14 @@ def importaFicha(ficha, cooperativa):
 
                 operacao = int(linha_atual[3])
 
-                ## Fatia o restante da string para montar a descrição, removendo os valores
-                texto = linha_atual[4].split(' ')
-                for posicao in texto:
-                    try:
-                        texto_ = posicao.replace('.', '')
-                        valor_capturado = float(texto_.replace(',', '.'))
-                    except:
-                        if descricao != '':
-                            descricao = descricao + ' ' + str(posicao)
-                        else:
-                            descricao = str(posicao)
-
-                descricao = descricao[:-2]
-
-                ## Cria variavel removendo o texto da descrição para sobrar apenas os valores para fatiar
-                string_valores = linha_atual[4].replace(descricao, "").split(' ')
-                # print(str(string_valores))
+                descricao = ''
+                textoLista = linha_atual[4:len(linha_atual) - 4]
+                for texto in textoLista:
+                    descricao = f'{descricao} {texto}'
+                print(descricao)
 
                 ## Captura valor, substitui virgulas por ponto, converte em float
-                str_valor = string_valores[0].replace('.', '')
+                str_valor = linha_atual[len(linha_atual) - 4].replace('.', '')
                 str_valor = str_valor.replace(',', '.')
                 valor = float(str_valor)
 
@@ -332,7 +321,7 @@ def layout():
                 vTipoArquivo = arquivo.split(".")[-1]
                 if vTipoArquivo.upper() == 'PRN':
                     cooperativa = abreFicha(f"{values['pathFichas']}/{arquivo}")
-                    moveFicha(values['pathFichas'],arquivo, cooperativa)
+                    moveFicha(values['pathFichas'], arquivo, cooperativa)
                 elif vTipoArquivo.upper() == 'PDF':
                     utils_f.converterPDF(values['pathFichas'], arquivo)
                     cooperativa = abreFicha(f"{values['pathFichas']}/"+str(arquivo).lower().replace("pdf", 'txt'), True)
