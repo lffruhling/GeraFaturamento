@@ -215,6 +215,9 @@ def geraRelatorio(vPath):
     global vFinalVigencia
     global vPercentualFaturamento
 
+    # To-DO
+    # Se fro Sicredi, agrupar por cooperativa e por agencia para falicitar o rateio!
+
     db = f.conexao()
     cursor = db.cursor()
     sql = """
@@ -250,7 +253,7 @@ def geraRelatorio(vPath):
         if len(rParcelas) == 0:
             vParcelas.append({"data": "--", "historico": "Sem Lancamentos para este Título", "valor": "--"})
         vTotalFaturado = (vTotalValorParcelas * float(vPercentualFaturamento)) / 100
-        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "parcelas":vParcelas, "total_valor_parcela":moeda(vTotalValorParcelas), "total_faturado": moeda(vTotalFaturado)})
+        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "cooperativa": titulo[4], "agencia": titulo[5], "parcelas":vParcelas, "total_valor_parcela":moeda(vTotalValorParcelas), "total_faturado": moeda(vTotalFaturado)})
     sql = """
             SELECT 
 	            coalesce(sum(valor), 0) AS total_parcelas
@@ -266,12 +269,30 @@ def geraRelatorio(vPath):
     else:
         vTotalFatura = 0
 
+    sqlRateio = """
+                    SELECT 
+                        ft.cooperativa,
+                        ft.agencia,
+                        coalesce(sum(fp.valor),0) as valor
+                    FROM fatura_titulos as ft
+                        LEFT JOIN fatura_parcelas as fp
+                            ON ft.id = fp.fatura_titulo_id
+                    GROUP BY fp.fatura_titulo_id, ft.cooperativa
+                    ORDER BY ft.cooperativa, ft.agencia;
+                """
+    cursor.execute(sqlRateio)
+    rRateios = cursor.fetchall()
+
+    rateios = []
+    for rateio in rRateios:
+        rateios.append({'cooperativa': rateio[0], "agencia": rateio[1], "valor": moeda(rateio[2])})
 
     context = {
         "inicio_vigencia": vInicioVigencia,
         "final_vigencia": vFinalVigencia,
         "cooperativa": 'Cresol Raízes',
         "titulos": titulos,
+        "rateios": rateios,
         "total_parcelas": moeda(vTotalParcelas),
         "total_faturamento": moeda(vTotalFatura)
     }
@@ -280,6 +301,9 @@ def geraRelatorio(vPath):
     vDataHora = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
     vData =datetime.now().strftime('%m_%Y')
     vNomeArquivo = f'fatura_{vDataHora}'
+    if vPath == '':
+        vPath = 'c:\\Temp'
+        utils_f.pastaExiste(vPath, True)
     vPathArquivo = f'{vPath}/faturamento/{vData}\\'
     utils_f.pastaExiste(f'{vPathArquivo}', True)
     arquivoDoc = f"{vPathArquivo}{vNomeArquivo}.docx"
