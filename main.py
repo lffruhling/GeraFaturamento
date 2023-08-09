@@ -1,9 +1,7 @@
 import os
-
-from _ctypes import sizeof
+import funcoes as f
 
 import constantes
-import funcoes as f
 from datetime import datetime, timedelta
 from docxtpl import DocxTemplate
 import locale
@@ -26,39 +24,235 @@ vFinalVigencia          = None
 vInicioVigencia         = None
 vPercentualFaturamento  = None
 
-def abreFicha(arquivo, isTXT=False):
-    with open(arquivo, 'r') as reader:
-        if not isTXT:
-            ficha_grafica = reader.readlines()
-            cooperativa = identificaCooperativa(ficha_grafica)
-            importaFicha(ficha_grafica, cooperativa)
-            # ficha_grafica.close()
-        else:
-            cooperativa = identificaCooperativa(reader)
-            importaFicha(reader, cooperativa)
+def atualizaBanco(values):
+    sql = 'UPDATE faturamento_percentual_cooperativa SET cooperativa=%s, nome=%s, valor=%s WHERE id=%s'
+    params = [values[1], values[2], values[3], values[0]]
 
-        return cooperativa
+    conexao = f.conexao()
+    cursor = conexao.cursor()
+    cursor.execute(sql, params)
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+
+def edit_cell(windowTelaConfig, key, row, col, justify='left'):
+
+    global textvariable, edit
+
+    def callback(event, row, col, text, key):
+        global edit
+        # event.widget gives you the same entry widget we created earlier
+        widget = event.widget
+        if key == 'Focus_Out':
+            # Get new text that has been typed into widget
+            text = widget.get()
+        # Destroy the entry widget
+        widget.destroy()
+        # Destroy all widgets
+        widget.master.destroy()
+        # Get the row from the table that was edited
+        # table variable exists here because it was called before the callback
+        values = list(table.item(row, 'values'))
+        # Store new value in the appropriate row and column
+        if(values[col] != text):
+            values[col] = text
+            table.item(row, values=values)
+            atualizaBanco(values)
+        edit = False
+
+
+    if edit or row <= 0 or col <= 0:
+        return
+
+    edit = True
+    # Get the Tkinter functionality for our window
+    root = windowTelaConfig.TKroot
+    # Gets the Widget object from the PySimpleGUI table - a PySimpleGUI table is really
+    # what's called a TreeView widget in TKinter
+    table = windowTelaConfig[key].Widget
+    # Get the row as a dict using .item function and get individual value using [col]
+    # Get currently selected value
+    text = table.item(row, "values")[col]
+
+    # Return x and y position of cell as well as width and height (in TreeView widget)
+    x, y, width, height = table.bbox(row, col)
+
+    # Create a new container that acts as container for the editable text input widget
+    frame = sg.tk.Frame(root)
+    # c
+    tamanhoCpoTitulo = windowTelaConfig['-L-tituloConfig'].get_size()
+    tamanhoCpoSperador = windowTelaConfig['-S-separadorConfig'].get_size()
+    alturaFinalY = y + tamanhoCpoTitulo[1] + tamanhoCpoSperador[1]
+    alturaFinalY += 15
+    alturaFinalX = x + 3
+
+    frame.place(x=alturaFinalX, y=alturaFinalY, anchor="nw", width=width, height=height)
+
+    # textvariable represents a text value
+    textvariable = sg.tk.StringVar()
+    textvariable.set(text)
+    # Used to acceot single line text input from user - editable text input
+    # frame is the parent window, textvariable is the initial value, justify is the position
+    entry = sg.tk.Entry(frame, textvariable=textvariable, justify=justify)
+    # Organizes widgets into blocks before putting them into the parent
+    entry.pack()
+    # selects all text in the entry input widget
+    entry.select_range(0, sg.tk.END)
+    # Puts cursor at end of input text
+    entry.icursor(sg.tk.END)
+    # Forces focus on the entry widget (actually when the user clicks because this initiates all this Tkinter stuff, e
+    # ending with a focus on what has been created)
+    entry.focus_force()
+    # When you click outside of the selected widget, everything is returned back to normal
+    # lambda e generates an empty function, which is turned into an event function
+    # which corresponds to the "FocusOut" (clicking outside of the cell) event
+    entry.bind("<FocusOut>", lambda e, r=row, c=col, t=text, k='Focus_Out':callback(e, r, c, t, k))
+
+def adicionaCoop(table):
+    global dados
+    print(dados)
+    layout = [
+        [sg.T('Cooperativa', s=15), sg.I(key="I-cooperativa", s=25, justification='right')],
+        [sg.T('Nome Apresentação', s=15), sg.I(key="I-nome", s=25, justification='right')],
+        [sg.T('Percentual', s=15), sg.I(key="I-percentual", s=25, justification='right')],
+        [sg.B('Cancelar', key='B-cancelar', s=15), sg.B('Salvar', key='B-salvar', s=15)]
+    ]
+
+    window = sg.Window("Nova Taxa", layout, modal=True, resizable=True, element_justification='center')
+
+    while True:
+        event, values = window.read()
+
+        if event == sg.WIN_CLOSED or event == 'B-cancelar':
+            break
+        elif event == "B-salvar":
+            sql = 'INSERT INTO faturamento_percentual_cooperativa (cooperativa, nome, valor) VALUE (%s,%s,%s)'
+            params = [values["I-cooperativa"], values["I-nome"], values["I-percentual"]]
+
+            conexao = f.conexao()
+            cursor = conexao.cursor()
+            cursor.execute(sql, params)
+            conexao.commit()
+            cursor.close()
+            conexao.close()
+            dados.append([cursor.lastrowid, values["I-cooperativa"],values["I-nome"], values["I-percentual"]])
+            table.update(dados)
+            sg.popup_no_titlebar('Taxa Adiciona com Sucesso!')
+            break
+
+    window.close()
+
+def tela_config_taxas():
+    global edit
+    global dados
+    edit = False
+    # ------ Layout Tela Taxas ------ #
+    conexao = f.conexao()
+    cursor = conexao.cursor()
+    cursor.execute('SELECT * FROM faturamento_percentual_cooperativa')
+
+    dados = list()
+    # image_data = i.btn_delete_img
+    for vRow in cursor.fetchall():
+        dados.append([vRow[0], vRow[1], vRow[2], vRow[3], 'X'])
+
+    cursor.close()
+    conexao.close()
+
+
+    layout = [
+        [sg.T('Cofigurações de Taxas', key="-L-tituloConfig")],
+        [sg.HSeparator(key="-S-separadorConfig")],
+        [sg.Table(values=dados, headings=['###', 'COOPERATIVA', 'NOME', 'PERCENTUAL', 'REMOVER'],
+                  auto_size_columns=True,
+                  max_col_width=25,
+                  num_rows=10,
+                  # alternating_row_color=sg.theme_button_color()[1],
+                  key="-TABLE-",
+                  row_height=20,
+                  tooltip='Tabela de Percentuais',
+                  expand_x=True,
+                  expand_y=True,
+                  # enable_events=True,
+                  # bind_return_key=True
+                  enable_click_events=True
+                  )
+         ],
+        [sg.B('Adicionar', key='B-NOVA', s=15)]
+        # [sg.B('Cancelar', key='btnCancelarTaxas', s=15), sg.B('Salvar', key='btnSalvarTaxas', s=15)]
+    ]
+
+    sg.set_options(dpi_awareness=True)
+    windowTelaConfig = sg.Window("Configurações de Taxas", layout, modal=True, resizable=True, element_justification='center')
+
+    while True:
+        event, values = windowTelaConfig.read()
+
+        if event == sg.WIN_CLOSED or event == 'btnCancelarTaxas':
+            break
+        elif isinstance(event, tuple):
+            table = windowTelaConfig['-TABLE-']
+            if isinstance(event[2][0], int) and event[2][0] > -1:
+                row, col = event[2]
+                if col == (len(table.ColumnHeadings) -1):
+                    result = sg.popup_ok_cancel('Deseja Remover esse item?')
+                    if result == 'OK':
+                        id = dados[row][0]
+                        sql = 'DELETE FROM faturamento_percentual_cooperativa WHERE id=%s'
+                        params = [id]
+                        conexao = f.conexao()
+                        cursor = conexao.cursor()
+                        cursor.execute(sql,params)
+                        conexao.commit()
+                        cursor.close()
+                        conexao.close()
+                        dados.pop(row)
+                        table.update(dados)
+                        sg.popup_no_titlebar('Registro Removido com sucesso!')
+                        continue
+            edit_cell(windowTelaConfig, '-TABLE-', row+1, col, justify="right")
+        elif event == 'B-NOVA':
+            adicionaCoop(windowTelaConfig['-TABLE-'])
+            # adicionaCoop()
+
+    windowTelaConfig.close()
+
 
 def moeda(valor):
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     valor = locale.currency(valor, grouping=True, symbol=None)
     return ('R$ %s' % valor)
-def identificaCooperativa(ficha):
+def identificaCooperativa(file):
     ## Identifica a Versão do Arquivo(Se é emitido pelo Sicredi ou da Cresol)
     vlinha = 1
+    vConsulta = None
 
-    for linha in ficha:
+    for linha in file:
         if (vlinha <= 20):
             if ("INVEST RAIZES" in linha):
-                return constantes.SICREDI_RAIZES
+                vConsulta = "INVEST RAIZES"
             elif ("CRESOL RAIZ" in linha):
-                return constantes.CRESOL_RAIZ
+                vConsulta = "CRESOL RAIZ"
             elif ("INVESTIMENTO CONEXAO" in linha):
-                return constantes.SICREDI_CONEXAO
+                vConsulta = "INVESTIMENTO CONEXAO"
             elif ("CRESOL GERAÇÕES" in linha):
-                return constantes.CRESOL_GERACAO
+                vConsulta = "CRESOL GERAÇÕES"
 
+            if vConsulta is not None:
+                conexao = f.conexao()
+                cursor = conexao.cursor()
+                cursor.execute('SELECT * FROM faturamento_percentual_cooperativa WHERE cooperativa LIKE %s', [f'%{vConsulta}%'])
+                result = cursor.fetchone()
+                cursor.close()
+                conexao.close()
+
+                if result is None:
+                    return None
+
+                return [result[2], result[3]]
+                break
         vlinha = vlinha + 1
+
 
 def identificaAgenciaSicredi(titulo):
     return titulo[2:4]
@@ -94,116 +288,128 @@ def insereTitulo(cooperativa, titulo, associado):
 
     return fTituloId
 
-def importaFicha(ficha, cooperativa):
+def importaFicha(arquivo, isTXT=False):
     global vFinalVigencia
     global vInicioVigencia
+    global vPercentualFaturamento
 
-    if cooperativa == constantes.SICREDI_RAIZES or cooperativa == constantes.SICREDI_CONEXAO:
-        for linha in ficha:
-            if ("TITULO") in linha:
-                vTitulo = linha[122:135]
-                break
+    with open(arquivo, 'r') as reader:
+        if not isTXT:
+            ficha_grafica = reader.readlines()
+        else:
+            ficha_grafica = reader
 
-        for linha in ficha:
-            if ("ASSOCIADO") in linha:
-                vAssociado = linha[16:57]
-                break
+        cooperativa, vPercentualFaturamento = identificaCooperativa(ficha_grafica)
 
-        fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
+        if cooperativa is None:
+            sg.popup_no_titlebar('Cooperativa Não Localizada! Processamento será abortado')
+            raise "Cooperativa Não Encontrada"
 
-        db = f.conexao()
-        cursor = db.cursor()
-        for linha in ficha:
-            if(len(str(linha[0:10]).split("/")) == 3):
-                vDataParcela    = linha[0:10]
-                dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
-                if (dtDataParcela >= vInicioVigencia) and (dtDataParcela >= vFinalVigencia):
-                    #Caso uma delas esteja fora do intervalo não deixa adicionar
-                    continue
-                elif not (dtDataParcela > vInicioVigencia) and not (dtDataParcela > vFinalVigencia):
-                    #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
-                    continue
+        if 'SICREDI' in str(cooperativa).upper():
+            for linha in ficha_grafica:
+                if ("TITULO") in linha:
+                    vTitulo = linha[122:135]
+                    break
 
-                vCod            = linha[12:15]
-                vHistorico      = linha[17:59]
-                if ("AMORTIZACAO DE PARCELA") in vHistorico or ("LIQUIDACAO DE PARCELA") in vHistorico or ("LIQUIDACAO DE TITULO") in vHistorico:
-                    vParcela        = linha[59:63]
-                    vValor          = linha[90:106]
+            for linha in ficha_grafica:
+                if ("ASSOCIADO") in linha:
+                    vAssociado = linha[16:57]
+                    break
 
-                    cursor.execute("INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
-                                   [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
+            fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
 
-                    # print(db.insert_id())
-        db.commit()
-        cursor.close()
-        db.close()
-    elif cooperativa == constantes.CRESOL_RAIZ or cooperativa == constantes.CRESOL_GERACAO:
-        for linha in ficha:
-            if ("Nome:") in linha:
-                vAssociado = linha[6:len(linha)]
-                break
+            db = f.conexao()
+            cursor = db.cursor()
+            for linha in ficha_grafica:
+                if(len(str(linha[0:10]).split("/")) == 3):
+                    vDataParcela    = linha[0:10]
+                    dtDataParcela = datetime.strptime(vDataParcela, "%d/%m/%Y")
+                    if (dtDataParcela >= vInicioVigencia) and (dtDataParcela >= vFinalVigencia):
+                        #Caso uma delas esteja fora do intervalo não deixa adicionar
+                        continue
+                    elif not (dtDataParcela > vInicioVigencia) and not (dtDataParcela > vFinalVigencia):
+                        #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
+                        continue
 
-        for linha in ficha:
-            if ("Contrato:") in linha:
-                vTitulo = linha[10:40]
-                break
+                    vCod            = linha[12:15]
+                    vHistorico      = linha[17:59]
+                    if ("AMORTIZACAO DE PARCELA") in vHistorico or ("LIQUIDACAO DE PARCELA") in vHistorico or ("LIQUIDACAO DE TITULO") in vHistorico:
+                        vParcela        = linha[59:63]
+                        vValor          = linha[90:106]
 
-        fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
+                        cursor.execute("INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
+                                       [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
 
-        db = f.conexao()
-        cursor = db.cursor()
+                        # print(db.insert_id())
+            db.commit()
+            cursor.close()
+            db.close()
+        elif 'CRESOL' in str(cooperativa).upper():
+            for linha in ficha_grafica:
+                if ("Nome:") in linha:
+                    vAssociado = linha[6:len(linha)]
+                    break
 
-        for linha in ficha:
+            for linha in ficha_grafica:
+                if ("Contrato:") in linha:
+                    vTitulo = linha[10:40]
+                    break
 
-            ## Divide a linha em um array de 4 partes
-            # linha_atual = linha.split(" ", 4)
-            linha_atual = linha.split(" ")
+            fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
 
-            vLinhaLancamento = False
-            ## identifica se é uma linha de lançamento de movimentação
-            if (linha_atual[1][0:3] in array_datas):
-                vLinhaLancamento = True
-                ## Se for linha de lançamento, captura as informações
+            db = f.conexao()
+            cursor = db.cursor()
+            for linha in ficha_grafica:
 
-            if vLinhaLancamento:
-                descricao = ''
-                parcela = int(linha_atual[0])
+                ## Divide a linha em um array de 4 partes
+                # linha_atual = linha.split(" ", 4)
+                linha_atual = linha.split(" ")
 
-                data_m = linha_atual[2].split('/')
-                dia_m = data_m[0]
-                mes_m = data_m[1]
-                ano_m = data_m[2]
-                data_movimento = datetime(int(ano_m), int(mes_m), int(dia_m))
+                vLinhaLancamento = False
+                ## identifica se é uma linha de lançamento de movimentação
+                if (linha_atual[1][0:3] in array_datas):
+                    vLinhaLancamento = True
+                    ## Se for linha de lançamento, captura as informações
 
-                operacao = int(linha_atual[3])
+                if vLinhaLancamento:
+                    descricao = ''
+                    parcela = int(linha_atual[0])
 
-                descricao = ''
-                textoLista = linha_atual[4:len(linha_atual) - 4]
-                for texto in textoLista:
-                    descricao = f'{descricao} {texto}'
-                print(descricao)
+                    data_m = linha_atual[2].split('/')
+                    dia_m = data_m[0]
+                    mes_m = data_m[1]
+                    ano_m = data_m[2]
+                    data_movimento = datetime(int(ano_m), int(mes_m), int(dia_m))
 
-                ## Captura valor, substitui virgulas por ponto, converte em float
-                str_valor = linha_atual[len(linha_atual) - 4].replace('.', '')
-                str_valor = str_valor.replace(',', '.')
-                valor = float(str_valor)
+                    operacao = int(linha_atual[3])
 
-                if (data_movimento >= vInicioVigencia) and (data_movimento >= vFinalVigencia):
-                    #Caso uma delas esteja fora do intervalo não deixa adicionar
-                    continue
-                elif not (data_movimento > vInicioVigencia) and not (data_movimento > vFinalVigencia):
-                    #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
-                    continue
+                    descricao = ''
+                    textoLista = linha_atual[4:len(linha_atual) - 4]
+                    for texto in textoLista:
+                        descricao = f'{descricao} {texto}'
+                    print(descricao)
 
-                print(data_movimento)
-                if ("AMORTIZAÇÃO") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
+                    ## Captura valor, substitui virgulas por ponto, converte em float
+                    str_valor = linha_atual[len(linha_atual) - 4].replace('.', '')
+                    str_valor = str_valor.replace(',', '.')
+                    valor = float(str_valor)
 
-                    cursor.execute(
-                        "INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
-                        [fTituloId, data_movimento, operacao, descricao, parcela, valor])
-        db.commit()
-        cursor.close()
-        db.close()
+                    if (data_movimento >= vInicioVigencia) and (data_movimento >= vFinalVigencia):
+                        #Caso uma delas esteja fora do intervalo não deixa adicionar
+                        continue
+                    elif not (data_movimento > vInicioVigencia) and not (data_movimento > vFinalVigencia):
+                        #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
+                        continue
+
+                    print(data_movimento)
+                    if ("AMORTIZAÇÃO") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
+
+                        cursor.execute(
+                            "INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
+                            [fTituloId, data_movimento, operacao, descricao, parcela, valor])
+            db.commit()
+            cursor.close()
+            db.close()
 def moveFicha(vPath, vNomeArquivo, cooperativa):
     vVigencia = datetime.now().strftime('%m_%Y')
     vMoverPara = f'{vPath}\\processados\\{vVigencia}\\{cooperativa}'
@@ -217,6 +423,8 @@ def geraRelatorio(vPath):
 
     # To-DO
     # Se fro Sicredi, agrupar por cooperativa e por agencia para falicitar o rateio!
+
+    print(vPercentualFaturamento)
 
     db = f.conexao()
     cursor = db.cursor()
@@ -310,51 +518,69 @@ def geraRelatorio(vPath):
     template.save(arquivoDoc)
     convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
     os.remove(arquivoDoc)
+    result = sg.popup_ok('Faturamento Gerado com Sucesso!')
+    if result == 'OK':
+        os.startfile(vPathArquivo)
+        os.startfile(f"{vPathArquivo}{vNomeArquivo}.pdf")
 
 def layout():
     global vInicioVigencia
     global vFinalVigencia
     global vPercentualFaturamento
 
-    sg.theme('reddit')  # Add a touch of color
-    # All the stuff inside your window.
-    layout = [[sg.T('Fichas', size=10), sg.In(key='pathFichas',disabled=True), sg.FolderBrowse(button_text='Buscar', target='pathFichas')],
-              [sg.T('Vigência Inicial', size=17), sg.T('Vigência Final', size=18), sg.T('Percentual de Faturamento', size=25)],
-              [sg.InputText(key='dtIni', size=20), sg.In(key='dtFin', size=20),sg.In(key='percentualFat', size=25)],
-              [sg.Button(button_text='Cancelar',key='btnCancelar', size=12), sg.Button(button_text='Gerar Fatura', key='btnGeraFatura' ,size=12)]]
+    now = datetime.now()
+    vDataIniF = now.strftime('%d/%m/%Y')
+    vDataFinF = now.strftime('%d/%m/%Y')
+
+    # ------ Thema Layout ------ #
+    sg.theme('reddit')
+
+    # ------ Menu ------ #
+
+    menu_def = [['Configurações', ["Taxas Cooperativas", "Dias de Intervalo"]]]
+
+    # ------ Layout Tela Principal------ #
+    layout = [
+        [sg.MenubarCustom(menu_def, tearoff=False, bar_background_color="#EEEEEE", bar_text_color="#000000", background_color="#EEEEEE", text_color="#000000")],
+        [sg.HSeparator()],
+        [sg.T('Fichas', s=11), sg.I(key='I-arquivos', justification="l", disabled=True), sg.FilesBrowse(button_text='Buscar', s=12, target='I-arquivos')],
+        [sg.T('Vigência Inicial', s=11), sg.I(vDataIniF, key='dtIni', s=11, justification="l"), sg.T('Vigência Final', s=11), sg.I(vDataFinF,key='dtFin', s=11, justification="l")],
+        [sg.HSeparator()],
+        [sg.B(button_text='Cancelar', key='btnCancelar', s=12), sg.B(button_text='Gerar Fatura', key='btnGeraFatura', s=12)]
+    ]
 
     # Create the Window
-    window = sg.Window('Gerar Fechamento', layout)
+    sg.set_options(dpi_awareness=True)
+    window = sg.Window('Gerar Fechamento', layout, resizable=True, grab_anywhere=True)
     # Event Loop to process "events" and get the "values" of the inputs
     while True:
         event, values = window.read()
         if event == sg.WIN_CLOSED or event == 'btnCancelar':  # if user closes window or clicks cancel
             break
 
-        vPercentualFaturamento = values['percentualFat']
+        if event == 'Taxas Cooperativas':
+            tela_config_taxas()
+            continue
 
-        if(len(str(values['pathFichas']).strip())):
-            arquivos = os.listdir(values['pathFichas'])
-            vInicioVigencia = datetime.strptime(values['dtIni'], '%d/%m/%Y')
-            vFinalVigencia = datetime.strptime(values['dtFin'], '%d/%m/%Y')
+        # vPercentualFaturamento = values['percentualFat']
+        vInicioVigencia = datetime.strptime(values['dtIni'], '%d/%m/%Y')
+        vFinalVigencia = datetime.strptime(values['dtFin'], '%d/%m/%Y')
 
-            for arquivo in arquivos:
-                #Ignora diretório de arquivos processados
-                if ('faturamento' in arquivo) or ('processados' in arquivo):
-                    continue
+        vArquivos = values['I-arquivos']
+        vListaArquivos = vArquivos.split(';')
+        if(len(vListaArquivos)>0):
+            for arquivo in vListaArquivos:
+
                 vTipoArquivo = arquivo.split(".")[-1]
                 if vTipoArquivo.upper() == 'PRN':
-                    cooperativa = abreFicha(f"{values['pathFichas']}/{arquivo}")
-                    moveFicha(values['pathFichas'], arquivo, cooperativa)
+                    importaFicha(arquivo)
                 elif vTipoArquivo.upper() == 'PDF':
                     utils_f.converterPDF(values['pathFichas'], arquivo)
-                    cooperativa = abreFicha(f"{values['pathFichas']}/"+str(arquivo).lower().replace("pdf", 'txt'), True)
-                    moveFicha(values['pathFichas'], arquivo, cooperativa)  # Move PDF
-                    moveFicha(values['pathFichas'], str(arquivo).lower().replace("pdf", 'txt'), cooperativa)  # Move TXT
+                    importaFicha(str(arquivo).lower().replace("pdf", 'txt'), True)
         else:
-            print('Sem arquivos para processar!')
+            sg.popup_no_titlebar('Sem arquivos para processar!')
 
-        geraRelatorio(values['pathFichas'])
+        geraRelatorio("c:/TEMP")
 
 
     window.close()
