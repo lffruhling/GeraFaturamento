@@ -1,7 +1,6 @@
 import os
 import funcoes as f
 
-import constantes
 from datetime import datetime, timedelta
 from docxtpl import DocxTemplate
 import locale
@@ -12,9 +11,6 @@ import util.funcoes as utils_f
 
 import PySimpleGUI as sg
 
-# vLocalProcessar = f'C:\\Temp\\Faturamento\\Processar\\'
-# vLocalProcessados = f'C:\\Temp\\Faturamento\\Processado\\'
-# vLocalRelatorios = f'C:\\Temp\\Faturamento\\Relatorios\\'
 array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/','11/','12/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
@@ -217,11 +213,11 @@ def tela_config_taxas():
 
     windowTelaConfig.close()
 
-
 def moeda(valor):
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     valor = locale.currency(valor, grouping=True, symbol=None)
     return ('R$ %s' % valor)
+
 def identificaCooperativa(file):
     ## Identifica a Versão do Arquivo(Se é emitido pelo Sicredi ou da Cresol)
     vlinha = 1
@@ -252,7 +248,6 @@ def identificaCooperativa(file):
                 return [result[2], result[3]]
                 break
         vlinha = vlinha + 1
-
 
 def identificaAgenciaSicredi(titulo):
     return titulo[2:4]
@@ -410,11 +405,6 @@ def importaFicha(arquivo, isTXT=False):
             db.commit()
             cursor.close()
             db.close()
-def moveFicha(vPath, vNomeArquivo, cooperativa):
-    vVigencia = datetime.now().strftime('%m_%Y')
-    vMoverPara = f'{vPath}\\processados\\{vVigencia}\\{cooperativa}'
-    utils_f.pastaExiste(vMoverPara, True)
-    shutil.move(f"{vPath}\\{vNomeArquivo}", f'{vMoverPara}\\{vNomeArquivo}')
 
 def geraRelatorio(vPath):
     global vInicioVigencia
@@ -529,7 +519,7 @@ def layout():
     global vPercentualFaturamento
 
     now = datetime.now()
-    vDataIniF = now.strftime('%d/%m/%Y')
+    vDataIniF = ( now - timedelta(days=30)).strftime('%d/%m/%Y')
     vDataFinF = now.strftime('%d/%m/%Y')
 
     # ------ Thema Layout ------ #
