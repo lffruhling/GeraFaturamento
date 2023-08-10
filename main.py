@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from docxtpl import DocxTemplate
 import locale
 from docx2pdf import convert
-import shutil
 
 import util.funcoes as utils_f
 
@@ -223,15 +222,15 @@ def identificaCooperativa(file):
     vlinha = 1
     vConsulta = None
 
-    for linha in file:
+    for l in file:
         if (vlinha <= 20):
-            if ("INVEST RAIZES" in linha):
+            if ("INVEST RAIZES" in l):
                 vConsulta = "INVEST RAIZES"
-            elif ("CRESOL RAIZ" in linha):
+            elif ("CRESOL RAIZ" in l):
                 vConsulta = "CRESOL RAIZ"
-            elif ("INVESTIMENTO CONEXAO" in linha):
+            elif ("INVESTIMENTO CONEXAO" in l):
                 vConsulta = "INVESTIMENTO CONEXAO"
-            elif ("CRESOL GERAÇÕES" in linha):
+            elif ("CRESOL GERAÇÕES" in l):
                 vConsulta = "CRESOL GERAÇÕES"
 
             if vConsulta is not None:
@@ -283,32 +282,37 @@ def insereTitulo(cooperativa, titulo, associado):
 
     return fTituloId
 
-def importaFicha(arquivo, isTXT=False):
+def importaFicha(arquivo):
     global vFinalVigencia
     global vInicioVigencia
     global vPercentualFaturamento
+    isTXT = str(arquivo.split(".")[-1]).lower() == 'txt'
 
-    with open(arquivo, 'r') as reader:
-        if not isTXT:
-            ficha_grafica = reader.readlines()
-        else:
-            ficha_grafica = reader
-
+    with open(arquivo, 'r') as ficha_grafica:
         cooperativa, vPercentualFaturamento = identificaCooperativa(ficha_grafica)
-
         if cooperativa is None:
             sg.popup_no_titlebar('Cooperativa Não Localizada! Processamento será abortado')
+            ficha_grafica.close()
             raise "Cooperativa Não Encontrada"
+        ficha_grafica.close()
+
+    with open(arquivo, 'r') as ficha_grafica:
 
         if 'SICREDI' in str(cooperativa).upper():
             for linha in ficha_grafica:
                 if ("TITULO") in linha:
-                    vTitulo = linha[122:135]
+                    if isTXT:
+                        vTitulo = linha[109:120]
+                    else:
+                        vTitulo = linha[122:135]
                     break
 
             for linha in ficha_grafica:
                 if ("ASSOCIADO") in linha:
-                    vAssociado = linha[16:57]
+                    if isTXT:
+                        vAssociado = linha[16:45]
+                    else:
+                        vAssociado = linha[16:57]
                     break
 
             fTituloId = insereTitulo(cooperativa, vTitulo, vAssociado)
@@ -565,8 +569,8 @@ def layout():
                 if vTipoArquivo.upper() == 'PRN':
                     importaFicha(arquivo)
                 elif vTipoArquivo.upper() == 'PDF':
-                    utils_f.converterPDF(values['pathFichas'], arquivo)
-                    importaFicha(str(arquivo).lower().replace("pdf", 'txt'), True)
+                    utils_f.converterPDF(arquivo)
+                    importaFicha(str(arquivo).lower().replace("pdf", 'txt'))
         else:
             sg.popup_no_titlebar('Sem arquivos para processar!')
 
