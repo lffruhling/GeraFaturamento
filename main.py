@@ -14,6 +14,10 @@ array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
 
+versaoExe = '1.0.1'
+
+verificaVersao = True
+
 #Variáveis Globais
 vFinalVigencia          = None
 vInicioVigencia         = None
@@ -559,6 +563,15 @@ def layout():
         # vPercentualFaturamento = values['percentualFat']
         vInicioVigencia = datetime.strptime(values['dtIni'], '%d/%m/%Y')
         vFinalVigencia = datetime.strptime(values['dtFin'], '%d/%m/%Y')
+        
+        if verificaVersao:
+            verificaVersao = False
+            versaoBanco = f.BuscaUltimaVersao()
+            if versaoExe != versaoBanco:
+                print('Atualizar')
+                f.atualizacaoDisponivel()
+            else:
+                print('Versao OK')
 
         vArquivos = values['I-arquivos']
         vListaArquivos = vArquivos.split(';')
