@@ -525,6 +525,7 @@ def layout():
     global vInicioVigencia
     global vFinalVigencia
     global vPercentualFaturamento
+    global verificaVersao
 
     now = datetime.now()
     vDataIniF = ( now - timedelta(days=30)).strftime('%d/%m/%Y')
@@ -540,6 +541,7 @@ def layout():
     # ------ Layout Tela Principal------ #
     layout = [
         [sg.MenubarCustom(menu_def, tearoff=False, bar_background_color="#EEEEEE", bar_text_color="#000000", background_color="#EEEEEE", text_color="#000000")],
+        [sg.Text('                  '),sg.Image(filename='logo1.png'),sg.Text(text='Gera Faturamento', text_color="Black", font=("Arial",22, "bold"), expand_x=True, justification='left')],
         [sg.HSeparator()],
         [sg.T('Fichas', s=11), sg.I(key='I-arquivos', justification="l", disabled=True), sg.FilesBrowse(button_text='Buscar', s=12, target='I-arquivos')],
         [sg.T('Vigência Inicial', s=11), sg.I(vDataIniF, key='dtIni', s=11, justification="l"), sg.T('Vigência Final', s=11), sg.I(vDataFinF,key='dtFin', s=11, justification="l")],
@@ -552,7 +554,7 @@ def layout():
     window = sg.Window('Gerar Fechamento', layout, resizable=True, grab_anywhere=True)
     # Event Loop to process "events" and get the "values" of the inputs
     while True:
-        event, values = window.read()
+        event, values = window.read(timeout=0.1)
         if event == sg.WIN_CLOSED or event == 'btnCancelar':  # if user closes window or clicks cancel
             break
 
@@ -570,21 +572,21 @@ def layout():
             if versaoExe != versaoBanco:
                 f.atualizacaoDisponivel()
 
-        vArquivos = values['I-arquivos']
-        vListaArquivos = vArquivos.split(';')
-        if(len(vListaArquivos)>0):
-            for arquivo in vListaArquivos:
+        if event == 'btnGeraFatura':
+            vArquivos = values['I-arquivos']
+            vListaArquivos = vArquivos.split(';')
+            if(len(vListaArquivos)>0):
+                for arquivo in vListaArquivos:
+                    vTipoArquivo = arquivo.split(".")[-1]
+                    if vTipoArquivo.upper() == 'PRN':
+                        importaFicha(arquivo)
+                    elif vTipoArquivo.upper() == 'PDF':
+                        utils_f.converterPDF(arquivo)
+                        importaFicha(str(arquivo).lower().replace("pdf", 'txt'))
+            else:
+                sg.popup_no_titlebar('Sem arquivos para processar!')
 
-                vTipoArquivo = arquivo.split(".")[-1]
-                if vTipoArquivo.upper() == 'PRN':
-                    importaFicha(arquivo)
-                elif vTipoArquivo.upper() == 'PDF':
-                    utils_f.converterPDF(arquivo)
-                    importaFicha(str(arquivo).lower().replace("pdf", 'txt'))
-        else:
-            sg.popup_no_titlebar('Sem arquivos para processar!')
-
-        geraRelatorio("c:/TEMP")
+            geraRelatorio("c:/TEMP")
 
 
     window.close()

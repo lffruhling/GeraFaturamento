@@ -525,6 +525,7 @@ def layout():
     global vInicioVigencia
     global vFinalVigencia
     global vPercentualFaturamento
+    global verificaVersao
 
     now = datetime.now()
     vDataIniF = ( now - timedelta(days=30)).strftime('%d/%m/%Y')
@@ -553,7 +554,7 @@ def layout():
     window = sg.Window('Gerar Fechamento', layout, resizable=True, grab_anywhere=True)
     # Event Loop to process "events" and get the "values" of the inputs
     while True:
-        event, values = window.read()
+        event, values = window.read(timeout=0.1)
         if event == sg.WIN_CLOSED or event == 'btnCancelar':  # if user closes window or clicks cancel
             break
 
@@ -569,26 +570,23 @@ def layout():
             verificaVersao = False
             versaoBanco = f.BuscaUltimaVersao()
             if versaoExe != versaoBanco:
-                print('Atualizar')
                 f.atualizacaoDisponivel()
+
+        if event == 'btnGeraFatura':
+            vArquivos = values['I-arquivos']
+            vListaArquivos = vArquivos.split(';')
+            if(len(vListaArquivos)>0):
+                for arquivo in vListaArquivos:
+                    vTipoArquivo = arquivo.split(".")[-1]
+                    if vTipoArquivo.upper() == 'PRN':
+                        importaFicha(arquivo)
+                    elif vTipoArquivo.upper() == 'PDF':
+                        utils_f.converterPDF(arquivo)
+                        importaFicha(str(arquivo).lower().replace("pdf", 'txt'))
             else:
-                print('Versao OK')
+                sg.popup_no_titlebar('Sem arquivos para processar!')
 
-        vArquivos = values['I-arquivos']
-        vListaArquivos = vArquivos.split(';')
-        if(len(vListaArquivos)>0):
-            for arquivo in vListaArquivos:
-
-                vTipoArquivo = arquivo.split(".")[-1]
-                if vTipoArquivo.upper() == 'PRN':
-                    importaFicha(arquivo)
-                elif vTipoArquivo.upper() == 'PDF':
-                    utils_f.converterPDF(arquivo)
-                    importaFicha(str(arquivo).lower().replace("pdf", 'txt'))
-        else:
-            sg.popup_no_titlebar('Sem arquivos para processar!')
-
-        geraRelatorio("c:/TEMP")
+            geraRelatorio("c:/TEMP")
 
 
     window.close()
