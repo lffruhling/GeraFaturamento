@@ -540,6 +540,7 @@ def layout():
     # ------ Layout Tela Principal------ #
     layout = [
         [sg.MenubarCustom(menu_def, tearoff=False, bar_background_color="#EEEEEE", bar_text_color="#000000", background_color="#EEEEEE", text_color="#000000")],
+        [sg.Text('                  '),sg.Image(filename='logo1.png'),sg.Text(text='Gera Faturamento', text_color="Black", font=("Arial",22, "bold"), expand_x=True, justification='left')],
         [sg.HSeparator()],
         [sg.T('Fichas', s=11), sg.I(key='I-arquivos', justification="l", disabled=True), sg.FilesBrowse(button_text='Buscar', s=12, target='I-arquivos')],
         [sg.T('Vigência Inicial', s=11), sg.I(vDataIniF, key='dtIni', s=11, justification="l"), sg.T('Vigência Final', s=11), sg.I(vDataFinF,key='dtFin', s=11, justification="l")],
