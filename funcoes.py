@@ -1,6 +1,8 @@
 import json
 import MySQLdb
 import constantes as c
+import PySimpleGUI as sg
+import os
 
 def conexao():
     return MySQLdb.connect(host=c.HOST_DB, user=c.USUARIO_DB, passwd=c.SENHA_DB,db=c.NOME_DB)
@@ -48,6 +50,43 @@ def carregaIndice(tabela, ano, mes):
     else:
         print('Sem resultados')
         return 0
+
+def atualizacaoDisponivel():
+    sg.theme('Reddit')
+
+    layout_atualizacao = [    
+                [sg.Text(text='Atenção: Existe uma Atualização Disponível', text_color="BLACK", font=("Arial"))],
+                [sg.Button('Atualizar Agora', key="btn_atualizar"), sg.Button('Depois', key="btn_cancelar")]      
+             ]
+    tela_atualizacao = sg.Window('Atualização Disponível', layout_atualizacao, modal=True)
+
+    while True:                    
+        eventos, valores = tela_atualizacao.read(timeout=0.1)
+        
+        if eventos == 'btn_atualizar':            
+            if os.path.isfile('C:/Temp/atualizador/atualizador_faturamento.exe'):
+                os.startfile('C:/Temp/atualizador/atualizador_faturamento.exe')
+                tela_atualizacao.Close()
+
+        if eventos == sg.WINDOW_CLOSED:
+            break
+        if eventos == 'btn_cancelar':
+            tela_atualizacao.close()   
+
+def BuscaUltimaVersao():
+    try:
+        db = conexao()
+        cursor = db.cursor()
+        cursor.execute("SELECT versao FROM versao_faturamento order by id desc limit 1")
+        resultado = cursor.fetchall()
+
+        if len(resultado) > 0:
+            valor = str(resultado[0][0])
+            return valor
+        else:            
+            return None
+    except Exception as erro:
+        print('Ocorreu um erro ao tentar carregar a última versão gerada. '  + str(erro), True)   
 
 #dados = carregaIndice('igpm', 2022, 3)
 
