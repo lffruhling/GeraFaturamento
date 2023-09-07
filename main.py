@@ -498,7 +498,7 @@ def geraRelatorio(vPath):
         "total_parcelas": moeda(vTotalParcelas),
         "total_faturamento": moeda(vTotalFatura)
     }
-    template = DocxTemplate('C:\\Temp\\Faturamento\\Template.docx')
+    template = DocxTemplate('Template.docx')
     template.render(context)
     vDataHora = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
     vData =datetime.now().strftime('%m_%Y')
