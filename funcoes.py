@@ -1,8 +1,11 @@
-import json
 import MySQLdb
 import constantes as c
 import PySimpleGUI as sg
 import os
+import locale
+import GerenciaBase as base
+import telas.tela_principal as TLSIS
+import util.funcoes as utils_f
 
 def conexao():
     return MySQLdb.connect(host=c.HOST_DB, user=c.USUARIO_DB, passwd=c.SENHA_DB,db=c.NOME_DB)
@@ -90,3 +93,54 @@ def BuscaUltimaVersao():
 
 #dados = carregaIndice('igpm', 2022, 3)
 
+def moeda(valor):
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+    valor = locale.currency(valor, grouping=True, symbol=None)
+    return ('R$ %s' % valor)
+
+def identificaAgenciaSicredi(titulo):
+    return titulo[2:4]
+
+def identificaCooperativa(file, tela=None):
+    ## Identifica a Versão do Arquivo(Se é emitido pelo Sicredi ou da Cresol)
+    vlinha = 1
+    vConsulta = None
+
+    if tela is not None:
+        TLSIS.atualizaBarraProgresso(tela, texto='Identificando cooperativa...')
+
+    for l in file:
+        if (vlinha <= 20):
+            if ("INVEST RAIZES" in l):
+                vConsulta = "INVEST RAIZES"
+            elif ("CRESOL RAIZ" in l):
+                vConsulta = "CRESOL RAIZ"
+            elif ("INVESTIMENTO CONEXAO" in l):
+                vConsulta = "INVESTIMENTO CONEXAO"
+            elif ("CRESOL GERAÇÕES" in l):
+                vConsulta = "CRESOL GERAÇÕES"
+
+            if vConsulta is not None:
+                result = base.retornaCoop(vConsulta)
+
+                if result is None:
+                    if tela is not None:
+                        TLSIS.atualizaBarraProgresso(tela,texto='Cooperativa não Identificada...', corTexto='RED')
+                    return None
+
+                if tela is not None:
+                    TLSIS.atualizaBarraProgresso(tela, texto='Cooperativa Identificada...', corTexto='GREEN')
+                return [result[2], result[3]]
+        vlinha = vlinha + 1
+
+def identificaCooperativaCombo(window, arquivo):
+    vTipoArquivo = arquivo.split(".")[-1]
+    if vTipoArquivo.upper() == 'PDF':
+        TLSIS.atualizaBarraProgresso(window, texto='Arquivo PDF. Necessário Conversão! Aguarde...')
+        utils_f.converterPDF(arquivo)
+        TLSIS.atualizaBarraProgresso(window, texto='Conversão finalizada.')
+    with open(str(arquivo).lower().replace("pdf", 'txt'), 'r') as ficha_grafica:
+        cooperativa, _ = identificaCooperativa(ficha_grafica, window)
+        ficha_grafica.close()
+    print(cooperativa)
+    window['C-cooperativas'].Update(cooperativa)
