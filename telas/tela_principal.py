@@ -10,9 +10,6 @@ from datetime import datetime, timedelta
 
 import PySimpleGUI as sg
 
-versaoExe = '1.0.1'
-verificaVersao = True
-
 def atualizaBarraProgresso(tela, texto=None, vMax=None, vAtual=None, corTexto = 'Blue'):
     if texto is not None:
         tela['-LABEL_PROGRESS-'].Update(texto, text_color=corTexto)
@@ -22,11 +19,12 @@ def atualizaBarraProgresso(tela, texto=None, vMax=None, vAtual=None, corTexto = 
         if vMax is not None:
             tela['-PROGRESS_BAR-'].Update(max=vMax)
 
+    tela.refresh()
+
 def abre_tela():
-    global vInicioVigencia
-    global vFinalVigencia
-    global vPercentualFaturamento
-    global verificaVersao
+    nomeCoop = None
+    versaoExe = '1.0.1'
+    verificaVersao = True
 
     dias = base.retornaDiasFaturamento()
 
@@ -109,10 +107,6 @@ def abre_tela():
             window['dtIni'].Update(value=vDataIniF)
             continue
 
-        # vPercentualFaturamento = values['percentualFat']
-        vInicioVigencia = datetime.strptime(values['dtIni'], '%d/%m/%Y')
-        vFinalVigencia = datetime.strptime(values['dtFin'], '%d/%m/%Y')
-
         if verificaVersao:
             verificaVersao = False
             versaoBanco = f.BuscaUltimaVersao()
@@ -120,16 +114,20 @@ def abre_tela():
                 f.atualizacaoDisponivel()
 
         if event == 'btnGeraFatura':
+            vInicioVigencia = utils_f.formata_data_banco(values['dtIni'], '%d/%m/%Y', '%Y-%m-%d')
+            vFinalVigencia = utils_f.formata_data_banco(values['dtFin'], '%d/%m/%Y', '%Y-%m-%d')
+
+            id = base.registraFaturamento(nomeCoop, vInicioVigencia, vFinalVigencia, values['I-extra'])
+
             vArquivos = values['I-arquivos']
             vListaArquivos = vArquivos.split(';')
             if (len(vListaArquivos) > 0):
                 for arquivo in vListaArquivos:
                     vTipoArquivo = arquivo.split(".")[-1]
-                    if vTipoArquivo.upper() == 'PRN':
-                        imp.importaFicha(arquivo, sg)
-                    elif vTipoArquivo.upper() == 'PDF':
+                    if vTipoArquivo.upper() == 'PDF':
                         utils_f.converterPDF(arquivo)
-                        imp.importaFicha(str(arquivo).lower().replace("pdf", 'txt'), sg)
+                        arquivo = str(arquivo).lower().replace("pdf", 'txt')
+                    imp.importaFicha(arquivo, sg, window, id)
             else:
                 sg.popup_no_titlebar('Sem arquivos para processar!')
 
@@ -139,6 +137,6 @@ def abre_tela():
             vArquivos = values['I-arquivos']
             vListaArquivos = vArquivos.split(';')
             arquivo = vListaArquivos[0]
-            f.identificaCooperativaCombo(window, arquivo)
+            nomeCoop = f.identificaCooperativaCombo(window, arquivo)
 
     window.close()

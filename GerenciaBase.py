@@ -35,6 +35,34 @@ def cooperativas():
 
     return result
 
+def registraFaturamento(cooperativa, dataIni, dataFin, extra):
+    vSql = 'SELECT id FROM faturamento_importacao WHERE cooperativa = %s AND data_importacao = %s AND extrajudicial = %s'
+    vParams = [cooperativa, datetime.now().strftime('%Y-%m-%d'),extra]
+    conexao = f.conexao()
+    cursor = conexao.cursor()
+
+    cursor.execute(vSql, vParams)
+    result = cursor.fetchone()
+
+    if result is not None:
+        return result[0]
+    else:
+        vSql = 'INSERT INTO faturamento_importacao (cooperativa, data_importacao, inicio_vigencia, final_vigencia, extrajudicial) VALUES (%s, %s, %s, %s, %s)'
+        vParams = [cooperativa, datetime.now().strftime('%Y-%m-%d'), dataIni, dataFin, extra]
+        cursor.execute(vSql, vParams)
+        conexao.commit()
+
+        id = cursor.lastrowid
+
+    cursor.close()
+    conexao.close()
+
+    return id
+
+
+
+
+
 def insereTitulo(cooperativa, titulo, associado):
     db = f.conexao()
     cursor = db.cursor()

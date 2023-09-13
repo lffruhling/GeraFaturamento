@@ -144,3 +144,4 @@ def identificaCooperativaCombo(window, arquivo):
         ficha_grafica.close()
     print(cooperativa)
     window['C-cooperativas'].Update(cooperativa)
+    return cooperativa
