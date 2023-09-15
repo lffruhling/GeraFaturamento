@@ -6,10 +6,7 @@ array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
 
-def importaFicha(arquivo, sg, tela, idImportacao):
-    global vFinalVigencia
-    global vInicioVigencia
-    global vPercentualFaturamento
+def importaFicha(arquivo, sg, tela, idImportacao, vFinalVigencia, vInicioVigencia):
     isTXT = str(arquivo.split(".")[-1]).lower() == 'txt'
 
     with open(arquivo, 'r') as ficha_grafica:
@@ -39,7 +36,7 @@ def importaFicha(arquivo, sg, tela, idImportacao):
                         vAssociado = linha[16:57]
                     break
 
-            fTituloId = base.insereTitulo(cooperativa, vTitulo, vAssociado)
+            fTituloId = base.insereTitulo(cooperativa, vTitulo, vAssociado, idImportacao)
 
             db = f.conexao()
             cursor = db.cursor()
@@ -60,7 +57,7 @@ def importaFicha(arquivo, sg, tela, idImportacao):
                         vParcela        = linha[59:63]
                         vValor          = linha[90:106]
 
-                        cursor.execute("INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
+                        cursor.execute("INSERT INTO faturamento_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
                                        [fTituloId, dtDataParcela, vCod, vHistorico.rstrip(), vParcela.rstrip(), vValor.lstrip()])
 
                         # print(db.insert_id())
@@ -78,7 +75,7 @@ def importaFicha(arquivo, sg, tela, idImportacao):
                     vTitulo = linha[10:40]
                     break
 
-            fTituloId = base.insereTitulo(cooperativa, vTitulo, vAssociado)
+            fTituloId = base.insereTitulo(cooperativa, vTitulo, vAssociado, idImportacao)
 
             db = f.conexao()
             cursor = db.cursor()
@@ -128,7 +125,7 @@ def importaFicha(arquivo, sg, tela, idImportacao):
                     if ("AMORTIZAÇÃO") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
 
                         cursor.execute(
-                            "INSERT INTO fatura_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
+                            "INSERT INTO faturamento_parcelas (fatura_titulo_id, data_parcela, cod, historico, parcela, valor) VALUE (%s,%s,%s,%s,%s,%s)",
                             [fTituloId, data_movimento, operacao, descricao, parcela, valor])
             db.commit()
             cursor.close()

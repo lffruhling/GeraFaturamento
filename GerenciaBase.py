@@ -59,35 +59,31 @@ def registraFaturamento(cooperativa, dataIni, dataFin, extra):
 
     return id
 
-
-
-
-
-def insereTitulo(cooperativa, titulo, associado):
+def insereTitulo(cooperativa, titulo, associado, idImportacao):
     db = f.conexao()
     cursor = db.cursor()
 
     vTitulo = str(titulo).strip()
     agencia = f.identificaAgenciaSicredi(vTitulo)
 
-    cursor.execute('SELECT id FROM fatura_titulos where titulo_contrato=%s AND cooperativa=%s;',
-                   [vTitulo, cooperativa])
+    cursor.execute('SELECT id FROM faturamento_titulos WHERE titulo_contrato=%s AND cooperativa=%s AND id_importacao = %s;',
+                   [vTitulo, cooperativa, idImportacao])
     result = cursor.fetchone()
 
     if result is None:
         cursor.execute(
-            'INSERT INTO fatura_titulos (titulo_contrato, cooperativa, agencia, associado, data_processamento) VALUE (%s,%s,%s,%s,now())',
-            [vTitulo, cooperativa, agencia, associado.rstrip()])
+            'INSERT INTO faturamento_titulos (titulo_contrato, id_importacao, cooperativa, agencia, associado, data_processamento) VALUE (%s,%s,%s,%s,%s,now())',
+            [vTitulo, idImportacao, cooperativa, agencia, associado.rstrip()])
         fTituloId = db.insert_id()
 
     else:
         cursor.execute(
-            "UPDATE fatura_titulos SET titulo_contrato=%s, cooperativa=%s, agencia=%s, associado=%s, data_processamento=%s  WHERE id=%s",
+            "UPDATE faturamento_titulos SET titulo_contrato=%s, cooperativa=%s, agencia=%s, associado=%s, data_processamento=%s  WHERE id=%s",
             [vTitulo, cooperativa, agencia, associado.rstrip(), datetime.now(), result[0]])
         fTituloId = result[0]
 
         # Limpa tabela de parcelas
-        cursor.execute('DELETE FROM fatura_parcelas WHERE fatura_titulo_id=%s', [fTituloId])
+        cursor.execute('DELETE FROM faturamento_parcelas WHERE fatura_titulo_id=%s', [fTituloId])
 
     db.commit()
     cursor.close()

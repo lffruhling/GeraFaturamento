@@ -140,8 +140,7 @@ def identificaCooperativaCombo(window, arquivo):
         utils_f.converterPDF(arquivo)
         TLSIS.atualizaBarraProgresso(window, texto='Conversão finalizada.')
     with open(str(arquivo).lower().replace("pdf", 'txt'), 'r') as ficha_grafica:
-        cooperativa, _ = identificaCooperativa(ficha_grafica, window)
+        cooperativa, vPercentual = identificaCooperativa(ficha_grafica, window)
         ficha_grafica.close()
-    print(cooperativa)
     window['C-cooperativas'].Update(cooperativa)
-    return cooperativa
+    return cooperativa , vPercentual

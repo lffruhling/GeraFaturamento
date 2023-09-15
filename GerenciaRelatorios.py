@@ -5,15 +5,9 @@ import os
 from docx2pdf import convert
 import util.funcoes as utils_f
 
-def geraRelatorio(vPath):
-    global vInicioVigencia
-    global vFinalVigencia
-    global vPercentualFaturamento
-
+def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercentualFaturamento):
     # To-DO
     # Se fro Sicredi, agrupar por cooperativa e por agencia para falicitar o rateio!
-
-    print(vPercentualFaturamento)
 
     db = f.conexao()
     cursor = db.cursor()
@@ -25,9 +19,11 @@ def geraRelatorio(vPath):
                 data_processamento,
                 cooperativa,
                 agencia
-            FROM fatura_titulos ORDER BY cooperativa, agencia, associado;
+            FROM faturamento_titulos
+            WHERE id_importacao = %s 
+            ORDER BY cooperativa, agencia, associado;
 		"""
-    cursor.execute(sql)
+    cursor.execute(sql, [idImportacao])
     rTitulos = cursor.fetchall()
 
     titulos = []
@@ -38,7 +34,8 @@ def geraRelatorio(vPath):
                     historico,
                     valor,
                     parcela 
-                FROM fatura_parcelas where fatura_titulo_id = %s
+                FROM faturamento_parcelas 
+                WHERE fatura_titulo_id = %s
         """
         cursor.execute(sql, [titulo[0]])
         rParcelas = cursor.fetchall()
@@ -54,8 +51,8 @@ def geraRelatorio(vPath):
     sql = """
             SELECT 
 	            coalesce(sum(valor), 0) AS total_parcelas
-            FROM fatura_parcelas AS fd 
-	            INNER JOIN edersondallabr.fatura_titulos AS ft
+            FROM faturamento_parcelas AS fd 
+	            INNER JOIN faturamento_titulos AS ft
 		            ON fd.fatura_titulo_id = ft.id
             """
     cursor.execute(sql)
@@ -71,8 +68,8 @@ def geraRelatorio(vPath):
                         ft.cooperativa,
                         ft.agencia,
                         coalesce(sum(fp.valor),0) as valor
-                    FROM fatura_titulos as ft
-                        LEFT JOIN fatura_parcelas as fp
+                    FROM faturamento_titulos as ft
+                        LEFT JOIN faturamento_parcelas as fp
                             ON ft.id = fp.fatura_titulo_id
                     GROUP BY fp.fatura_titulo_id, ft.cooperativa
                     ORDER BY ft.cooperativa, ft.agencia;

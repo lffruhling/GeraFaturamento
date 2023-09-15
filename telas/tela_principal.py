@@ -77,6 +77,7 @@ def abre_tela():
     # Create the Window
     sg.set_options(dpi_awareness=True)
     window = sg.Window('Gerar Fechamento', layout, resizable=True, grab_anywhere=True)
+    vPercentual = None
     # Event Loop to process "events" and get the "values" of the inputs
     while True:
         event, values = window.read(timeout=0.1)
@@ -117,6 +118,9 @@ def abre_tela():
             vInicioVigencia = utils_f.formata_data_banco(values['dtIni'], '%d/%m/%Y', '%Y-%m-%d')
             vFinalVigencia = utils_f.formata_data_banco(values['dtFin'], '%d/%m/%Y', '%Y-%m-%d')
 
+            vInicioVigenciaCalc = datetime.strptime(values['dtIni'], '%d/%m/%Y')
+            vFinalVigenciaCalc = datetime.strptime(values['dtFin'], '%d/%m/%Y')
+
             id = base.registraFaturamento(nomeCoop, vInicioVigencia, vFinalVigencia, values['I-extra'])
 
             vArquivos = values['I-arquivos']
@@ -127,16 +131,16 @@ def abre_tela():
                     if vTipoArquivo.upper() == 'PDF':
                         utils_f.converterPDF(arquivo)
                         arquivo = str(arquivo).lower().replace("pdf", 'txt')
-                    imp.importaFicha(arquivo, sg, window, id)
+                    imp.importaFicha(arquivo, sg, window, id, vInicioVigenciaCalc, vFinalVigenciaCalc)
             else:
                 sg.popup_no_titlebar('Sem arquivos para processar!')
 
-            rel.geraRelatorio("c:/TEMP")
+            rel.geraRelatorio("c:/TEMP", id, vInicioVigenciaCalc, vFinalVigenciaCalc, vPercentual)
         elif event == 'I-arquivos':
             atualizaBarraProgresso(window, texto='Preparando sistema para importação! Aguarde...')
             vArquivos = values['I-arquivos']
             vListaArquivos = vArquivos.split(';')
             arquivo = vListaArquivos[0]
-            nomeCoop = f.identificaCooperativaCombo(window, arquivo)
+            nomeCoop, vPercentual = f.identificaCooperativaCombo(window, arquivo)
 
     window.close()
