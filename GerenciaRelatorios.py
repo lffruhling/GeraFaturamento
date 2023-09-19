@@ -5,7 +5,7 @@ import os
 from docx2pdf import convert
 import util.funcoes as utils_f
 
-def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercentualFaturamento):
+def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercentualFaturamento, CoopNome, extra):
     # To-DO
     # Se fro Sicredi, agrupar por cooperativa e por agencia para falicitar o rateio!
 
@@ -47,15 +47,16 @@ def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercent
         if len(rParcelas) == 0:
             vParcelas.append({"data": "--", "historico": "Sem Lancamentos para este Título", "valor": "--"})
         vTotalFaturado = (vTotalValorParcelas * float(vPercentualFaturamento)) / 100
-        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3], "cooperativa": titulo[4], "agencia": titulo[5], "parcelas":vParcelas, "total_valor_parcela":f.moeda(vTotalValorParcelas), "total_faturado": f.moeda(vTotalFaturado)})
+        titulos.append({'nro_titulo': titulo[1], "associado": titulo[2], "data_processamento": titulo[3].strftime('%d/%m/%Y'), "cooperativa": titulo[4], "agencia": titulo[5], "parcelas":vParcelas, "total_valor_parcela":f.moeda(vTotalValorParcelas), "total_faturado": f.moeda(vTotalFaturado)})
     sql = """
             SELECT 
 	            coalesce(sum(valor), 0) AS total_parcelas
             FROM faturamento_parcelas AS fd 
 	            INNER JOIN faturamento_titulos AS ft
 		            ON fd.fatura_titulo_id = ft.id
+		    WHERE id_importacao = %s
             """
-    cursor.execute(sql)
+    cursor.execute(sql,[idImportacao])
     rTotalParcelas = cursor.fetchone()
     vTotalParcelas = rTotalParcelas[0]
     if vTotalParcelas > 0:
@@ -71,20 +72,28 @@ def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercent
                     FROM faturamento_titulos as ft
                         LEFT JOIN faturamento_parcelas as fp
                             ON ft.id = fp.fatura_titulo_id
+                    WHERE id_importacao = %s
                     GROUP BY fp.fatura_titulo_id, ft.cooperativa
-                    ORDER BY ft.cooperativa, ft.agencia;
+                    ORDER BY ft.agencia;
                 """
-    cursor.execute(sqlRateio)
+    cursor.execute(sqlRateio, [idImportacao])
     rRateios = cursor.fetchall()
 
     rateios = []
     for rateio in rRateios:
         rateios.append({'cooperativa': rateio[0], "agencia": rateio[1], "valor": f.moeda(rateio[2])})
 
+    if extra:
+        extra_form = 'Sim'
+    else:
+        extra_form = 'Não'
+
     context = {
-        "inicio_vigencia": vInicioVigencia,
-        "final_vigencia": vFinalVigencia,
-        "cooperativa": 'Cresol Raízes',
+        "inicio_vigencia_formatada": vInicioVigencia,
+        "final_vigencia_formatada": vFinalVigencia,
+        "cooperativa": CoopNome,
+        "percentual_fat": f'{vPercentualFaturamento}%',
+        "extra_formatado": extra_form,
         "titulos": titulos,
         "rateios": rateios,
         "total_parcelas": f.moeda(vTotalParcelas),

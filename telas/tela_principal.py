@@ -129,18 +129,22 @@ def abre_tela():
                 for arquivo in vListaArquivos:
                     vTipoArquivo = arquivo.split(".")[-1]
                     if vTipoArquivo.upper() == 'PDF':
-                        utils_f.converterPDF(arquivo)
+                        if not utils_f.arquivoExiste(str(arquivo).lower().replace("pdf", 'txt')):
+                            utils_f.converterPDF(arquivo)
+
                         arquivo = str(arquivo).lower().replace("pdf", 'txt')
-                    imp.importaFicha(arquivo, sg, window, id, vInicioVigenciaCalc, vFinalVigenciaCalc)
+
+                    nomeCoop, vPercentual = f.identificaCooperativaCombo(window, arquivo,values['I-extra'])
+                    imp.importaFicha(arquivo, sg, window, id, vInicioVigenciaCalc, vFinalVigenciaCalc, values['I-extra'], nomeCoop, vPercentual)
             else:
                 sg.popup_no_titlebar('Sem arquivos para processar!')
 
-            rel.geraRelatorio("c:/TEMP", id, vInicioVigenciaCalc, vFinalVigenciaCalc, vPercentual)
+            rel.geraRelatorio("c:/TEMP", id, values['dtIni'], values['dtFin'], vPercentual, nomeCoop, values['I-extra'])
         elif event == 'I-arquivos':
             atualizaBarraProgresso(window, texto='Preparando sistema para importação! Aguarde...')
             vArquivos = values['I-arquivos']
             vListaArquivos = vArquivos.split(';')
             arquivo = vListaArquivos[0]
-            nomeCoop, vPercentual = f.identificaCooperativaCombo(window, arquivo)
+            nomeCoop, vPercentual = f.identificaCooperativaCombo(window, arquivo, values['I-extra'])
 
     window.close()

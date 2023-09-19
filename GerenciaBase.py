@@ -45,7 +45,27 @@ def registraFaturamento(cooperativa, dataIni, dataFin, extra):
     result = cursor.fetchone()
 
     if result is not None:
-        return result[0]
+        vId = result[0]
+
+        vSql = 'SELECT id FROM faturamento_titulos WHERE id_importacao = %s'
+        vParams = [vId]
+        cursor.execute(vSql, vParams)
+        result = cursor.fetchone()
+
+        if result is not None:
+            vIdFatTitulos = result[0]
+
+            vSql = 'DELETE FROM faturamento_parcelas WHERE fatura_titulo_id = %s'
+            vParams = [vIdFatTitulos]
+            cursor.execute(vSql, vParams)
+            conexao.commit()
+
+            vSql = 'DELETE FROM faturamento_titulos WHERE id_importacao = %s'
+            vParams = [vId]
+            cursor.execute(vSql, vParams)
+            conexao.commit()
+
+        return vId
     else:
         vSql = 'INSERT INTO faturamento_importacao (cooperativa, data_importacao, inicio_vigencia, final_vigencia, extrajudicial) VALUES (%s, %s, %s, %s, %s)'
         vParams = [cooperativa, datetime.now().strftime('%Y-%m-%d'), dataIni, dataFin, extra]
@@ -91,10 +111,10 @@ def insereTitulo(cooperativa, titulo, associado, idImportacao):
 
     return fTituloId
 
-def retornaCoop(vConsulta):
+def retornaCoop(vConsulta, extra):
     conexao = f.conexao()
     cursor = conexao.cursor()
-    cursor.execute('SELECT * FROM faturamento_percentual_cooperativa WHERE cooperativa LIKE %s', [f'%{vConsulta}%'])
+    cursor.execute('SELECT * FROM faturamento_percentual_cooperativa WHERE cooperativa LIKE %s AND extrajudicial= %s', [f'%{vConsulta}%', extra])
     result = cursor.fetchone()
     cursor.close()
     conexao.close()

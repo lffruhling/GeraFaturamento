@@ -101,7 +101,7 @@ def moeda(valor):
 def identificaAgenciaSicredi(titulo):
     return titulo[2:4]
 
-def identificaCooperativa(file, tela=None):
+def identificaCooperativa(file, tela=None, extra=False):
     ## Identifica a Versão do Arquivo(Se é emitido pelo Sicredi ou da Cresol)
     vlinha = 1
     vConsulta = None
@@ -121,7 +121,7 @@ def identificaCooperativa(file, tela=None):
                 vConsulta = "CRESOL GERAÇÕES"
 
             if vConsulta is not None:
-                result = base.retornaCoop(vConsulta)
+                result = base.retornaCoop(vConsulta, extra)
 
                 if result is None:
                     if tela is not None:
@@ -133,14 +133,14 @@ def identificaCooperativa(file, tela=None):
                 return [result[2], result[3]]
         vlinha = vlinha + 1
 
-def identificaCooperativaCombo(window, arquivo):
+def identificaCooperativaCombo(window, arquivo, extra):
     vTipoArquivo = arquivo.split(".")[-1]
     if vTipoArquivo.upper() == 'PDF':
         TLSIS.atualizaBarraProgresso(window, texto='Arquivo PDF. Necessário Conversão! Aguarde...')
         utils_f.converterPDF(arquivo)
         TLSIS.atualizaBarraProgresso(window, texto='Conversão finalizada.')
     with open(str(arquivo).lower().replace("pdf", 'txt'), 'r') as ficha_grafica:
-        cooperativa, vPercentual = identificaCooperativa(ficha_grafica, window)
+        cooperativa, vPercentual = identificaCooperativa(ficha_grafica, window, extra)
         ficha_grafica.close()
     window['C-cooperativas'].Update(cooperativa)
     return cooperativa , vPercentual

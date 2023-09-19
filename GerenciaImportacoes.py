@@ -1,22 +1,24 @@
 import funcoes as f
 import GerenciaBase as base
 from datetime import datetime
+import util.funcoes as utils_f
 
 array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/','11/','12/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
 
-def importaFicha(arquivo, sg, tela, idImportacao, vFinalVigencia, vInicioVigencia):
+def importaFicha(arquivo, sg, tela, idImportacao, vFinalVigencia, vInicioVigencia, extra, cooperativa, vPercentualFaturamento):
     isTXT = str(arquivo.split(".")[-1]).lower() == 'txt'
 
-    with open(arquivo, 'r') as ficha_grafica:
-        cooperativa, vPercentualFaturamento = f.identificaCooperativa(ficha_grafica)
-        if cooperativa is None:
-            sg.popup_no_titlebar('Cooperativa Não Localizada! Processamento será abortado')
-            ficha_grafica.close()
-            raise "Cooperativa Não Encontrada"
-        ficha_grafica.close()
-
+    # with open(arquivo, 'r') as ficha_grafica:
+    #     # cooperativa, vPercentualFaturamento = f.identificaCooperativa(ficha_grafica, tela, extra)
+    #     if cooperativa is None:
+    #         sg.popup_no_titlebar('Cooperativa Não Localizada! Processamento será abortado')
+    #         ficha_grafica.close()
+    #         raise "Cooperativa Não Encontrada"
+    #     ficha_grafica.close()
+    #
+    #
     with open(arquivo, 'r') as ficha_grafica:
 
         if 'SICREDI' in str(cooperativa).upper():
@@ -130,3 +132,6 @@ def importaFicha(arquivo, sg, tela, idImportacao, vFinalVigencia, vInicioVigenci
             db.commit()
             cursor.close()
             db.close()
+
+    ficha_grafica.close()
+    utils_f.removeArquivo(arquivo)
