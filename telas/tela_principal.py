@@ -23,7 +23,7 @@ def atualizaBarraProgresso(tela, texto=None, vMax=None, vAtual=None, corTexto = 
 
 def abre_tela():
     nomeCoop = None
-    versaoExe = '1.0.1'
+    versaoExe = '1.0.2'
     verificaVersao = True
 
     dias = base.retornaDiasFaturamento()
@@ -69,6 +69,7 @@ def abre_tela():
         [
             sg.B(button_text='Cancelar', key='btnCancelar', s=12),
             sg.B(button_text='Gerar Fatura', key='btnGeraFatura', s=12),
+            sg.Text('Versão: ' + versaoExe, expand_x=True, justification='right'),
             sg.T(text='', key="-LABEL_PROGRESS-")
         ],
         [sg.ProgressBar(100, orientation='h', key='-PROGRESS_BAR-', bar_color=("#338AFF", "#D1D7DF"), expand_x=True, size=(40, 5))],
