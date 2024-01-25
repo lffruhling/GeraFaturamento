@@ -10,6 +10,22 @@ from datetime import datetime, timedelta
 
 import PySimpleGUI as sg
 
+#E-mail Erro
+import sys
+import traceback
+from send_mail import enviar_email_erro
+
+def excecao_handler(excecao_tipo, excecao_valor, trace_back):
+    # Captura informações sobre a exceção
+    excecao = f"{excecao_tipo.__name__}: {excecao_valor}"
+    traceback_info = traceback.format_tb(trace_back)
+
+    # Envia e-mail com informações da exceção
+    enviar_email_erro(f"{excecao}\n\nDetalhes do Traceback:\n{''.join(traceback_info)}", 'COrretor Monetário')
+
+# Configura o manipulador de exceções global
+sys.excepthook = excecao_handler
+
 def atualizaBarraProgresso(tela, texto=None, vMax=None, vAtual=None, corTexto = 'Blue'):
     if texto is not None:
         tela['-LABEL_PROGRESS-'].Update(texto, text_color=corTexto)

@@ -7,6 +7,22 @@ import GerenciaBase as base
 import telas.tela_principal as TLSIS
 import util.funcoes as utils_f
 
+#E-mail Erro
+import sys
+import traceback
+from send_mail import enviar_email_erro
+
+def excecao_handler(excecao_tipo, excecao_valor, trace_back):
+    # Captura informações sobre a exceção
+    excecao = f"{excecao_tipo.__name__}: {excecao_valor}"
+    traceback_info = traceback.format_tb(trace_back)
+
+    # Envia e-mail com informações da exceção
+    enviar_email_erro(f"{excecao}\n\nDetalhes do Traceback:\n{''.join(traceback_info)}", 'COrretor Monetário')
+
+# Configura o manipulador de exceções global
+sys.excepthook = excecao_handler
+
 def conexao():
     return MySQLdb.connect(host=c.HOST_DB, user=c.USUARIO_DB, passwd=c.SENHA_DB,db=c.NOME_DB)
 

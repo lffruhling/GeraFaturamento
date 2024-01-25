@@ -3,6 +3,22 @@ import GerenciaBase as base
 from datetime import datetime
 import util.funcoes as utils_f
 
+#E-mail Erro
+import sys
+import traceback
+from send_mail import enviar_email_erro
+
+def excecao_handler(excecao_tipo, excecao_valor, trace_back):
+    # Captura informações sobre a exceção
+    excecao = f"{excecao_tipo.__name__}: {excecao_valor}"
+    traceback_info = traceback.format_tb(trace_back)
+
+    # Envia e-mail com informações da exceção
+    enviar_email_erro(f"{excecao}\n\nDetalhes do Traceback:\n{''.join(traceback_info)}", 'COrretor Monetário')
+
+# Configura o manipulador de exceções global
+sys.excepthook = excecao_handler
+
 array_datas      = ['01/','02/','03/','04/','05/','06/','07/','08/','09/','10/','11/','12/',
                     '13/','14/','15/','16/','17/','18/','19/','20/','21/','22/','23/','24/',
                     '25/','26/','27/','28/','29/','30/','31/']
