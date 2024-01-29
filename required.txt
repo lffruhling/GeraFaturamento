@@ -1,0 +1,6 @@
+--trusted-host pypi.python.org
+--trusted-host files.pythonhosted.org
+--trusted-host pypi.org
+pdfplumber==0.10.3
+docxtpl==0.16.7
+docx2pdf==0.1.8

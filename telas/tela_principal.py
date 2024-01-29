@@ -21,7 +21,7 @@ def excecao_handler(excecao_tipo, excecao_valor, trace_back):
     traceback_info = traceback.format_tb(trace_back)
 
     # Envia e-mail com informações da exceção
-    enviar_email_erro(f"{excecao}\n\nDetalhes do Traceback:\n{''.join(traceback_info)}", 'COrretor Monetário')
+    enviar_email_erro(f"{excecao}\n\nDetalhes do Traceback:\n{''.join(traceback_info)}", 'Gera Faturamento')
 
 # Configura o manipulador de exceções global
 sys.excepthook = excecao_handler
