@@ -10,6 +10,8 @@ import sys
 import traceback
 from send_mail import enviar_email_erro
 
+import ctypes
+
 def excecao_handler(excecao_tipo, excecao_valor, trace_back):
     # Captura informações sobre a exceção
     excecao = f"{excecao_tipo.__name__}: {excecao_valor}"
@@ -126,10 +128,13 @@ def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercent
     vPathArquivo = f'{vPath}/faturamento/{vData}\\'
     utils_f.pastaExiste(f'{vPathArquivo}', True)
     arquivoDoc = f"{vPathArquivo}{vNomeArquivo}.docx"
-    template.save(arquivoDoc)
-    convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
-    os.remove(arquivoDoc)
-    # result = sg.popup_ok('Faturamento Gerado com Sucesso!')
-    # if result == 'OK':
-    os.startfile(vPathArquivo)
-    os.startfile(f"{vPathArquivo}{vNomeArquivo}.pdf")
+    try:
+        template.save(arquivoDoc)
+        convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
+        os.remove(arquivoDoc)
+        # result = sg.popup_ok('Faturamento Gerado com Sucesso!')
+        # if result == 'OK':
+        os.startfile(vPathArquivo)
+        os.startfile(f"{vPathArquivo}{vNomeArquivo}.pdf")
+    except Exception as erro:
+        ctypes.windll.user32.MessageBoxW(0, "Ocorreu uma falha ao tentar gerar o novo resulado. IMPORTANTE: Feche os arquivos Word(.docx) abertos, após, tente novamente.", "Falha ao gerar arquivo", 1)
