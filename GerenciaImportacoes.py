@@ -123,9 +123,9 @@ def importaFicha(arquivo, sg, tela, idImportacao, vFinalVigencia, vInicioVigenci
 
                     descricao = ''
                     textoLista = linha_atual[4:len(linha_atual) - 4]
+
                     for texto in textoLista:
                         descricao = f'{descricao} {texto}'
-                    print(descricao)
 
                     ## Captura valor, substitui virgulas por ponto, converte em float
                     str_valor = linha_atual[len(linha_atual) - 4].replace('.', '')
@@ -139,7 +139,6 @@ def importaFicha(arquivo, sg, tela, idImportacao, vFinalVigencia, vInicioVigenci
                         #Caso as Duas datas seja Falsas, No caso as duas estão fora do intervalo
                         continue
 
-                    print(data_movimento)
                     if ("AMORTIZAÇÃO") in descricao or ("LIQUIDACAO DE PARCELA") in descricao or ("LIQUIDACAO DE TITULO") in descricao:
 
                         cursor.execute(

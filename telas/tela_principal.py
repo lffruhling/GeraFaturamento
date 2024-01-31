@@ -39,7 +39,7 @@ def atualizaBarraProgresso(tela, texto=None, vMax=None, vAtual=None, corTexto = 
 
 def abre_tela():
     nomeCoop = None
-    versaoExe = '1.0.2'
+    versaoExe = '1.1.0'
     verificaVersao = True
 
     dias = base.retornaDiasFaturamento()
