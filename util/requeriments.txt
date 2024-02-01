@@ -5,7 +5,7 @@ pyautogui==0.9.53
 selenium==4.4.0
 cryptography==37.0.4
 mysqlclient==2.1.1
-pyinstaller==5.7.0
+pyinstaller==5.13.2
 pypdf2==3.0.1
 pyscreeze==0.1.28
 pywinauto==0.6.8

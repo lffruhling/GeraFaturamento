@@ -7,7 +7,7 @@ import time
 import wget
 import os
 from zipfile import ZipFile
-
+import os
 
 tela = None
 
@@ -32,13 +32,13 @@ def progress(valor):
     progress_bar.UpdateBar(valor)
 
 def encerraCorretor():
-    PROCNAME = "main.exe"
+    # PROCNAME = "main.exe"
 
     #for proc in psutil.process_iter():
     #    if proc.name() == PROCNAME:
     #        proc.kill()
     
-    os.system('taskkill /im main.exe')
+    os.system('taskkill /im GeraFaturamento.exe')
 
 def bar_custom(atual, total, largura=80): 
     global tela
@@ -65,6 +65,9 @@ def telaAtualizador():
 
         encerraCorretor()
         baixarArquivo()
-        return None        
+        return None
+    tela['status'].Update('Aguarde... Abrindo Sistema de Faturamentos...')
+    os.system(r"C:\Temp\GeraFaturamento\GeraFaturamento.exe")
+    sg.popup_ok('Sistema de Faturamentos atualizado com sucesso!')
         
 telaAtualizador()
