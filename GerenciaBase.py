@@ -43,7 +43,7 @@ def retornaDiasFaturamento():
 def cooperativas():
     conexao = f.conexao()
     cursor = conexao.cursor()
-    cursor.execute('SELECT nome FROM faturamento_percentual_cooperativa ORDER BY nome', [])
+    cursor.execute('SELECT concat(nome, " | ", cooperativa) as nome FROM faturamento_percentual_cooperativa ORDER BY nome', [])
 
     result = cursor.fetchall()
     cursor.close()

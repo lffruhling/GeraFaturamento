@@ -78,7 +78,7 @@ def abre_tela():
         ],
         [
             sg.T('Cooperativa:', s=11),
-            sg.Combo(values=['Padrão'], key="C-cooperativas", enable_events=True, expand_x=True),
+            sg.Combo(values=['Padrão'], key="C-cooperativas", enable_events=True, size=(60,11)),
             sg.Check(key="I-extra", text='Extrajudicial', default=False, expand_x=True)
         ],
         [sg.HSeparator()],
