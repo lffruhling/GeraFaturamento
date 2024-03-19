@@ -11,6 +11,15 @@ import traceback
 from send_mail import enviar_email_erro
 
 import ctypes
+import time
+
+from spire.doc import *
+from spire.doc.common import *
+
+import sys, io
+
+buffer = io.StringIO()
+sys.stdout = sys.stderr = buffer
 
 def excecao_handler(excecao_tipo, excecao_valor, trace_back):
     # Captura informações sobre a exceção
@@ -123,18 +132,39 @@ def geraRelatorio(vPath, idImportacao, vInicioVigencia, vFinalVigencia, vPercent
     vData =datetime.now().strftime('%m_%Y')
     vNomeArquivo = f'fatura_{vDataHora}'
     if vPath == '':
-        vPath = 'c:\\Temp'
+        vPath = 'c:/Temp'
         utils_f.pastaExiste(vPath, True)
-    vPathArquivo = f'{vPath}/faturamento/{vData}\\'
+    vPathArquivo = f'{vPath}/faturamento/{vData}/'
     utils_f.pastaExiste(f'{vPathArquivo}', True)
     arquivoDoc = f"{vPathArquivo}{vNomeArquivo}.docx"
+    
+    #try:
     try:
         template.save(arquivoDoc)
-        convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
-        os.remove(arquivoDoc)
-        # result = sg.popup_ok('Faturamento Gerado com Sucesso!')
-        # if result == 'OK':
-        os.startfile(vPathArquivo)
-        os.startfile(f"{vPathArquivo}{vNomeArquivo}.pdf")
     except Exception as erro:
-        ctypes.windll.user32.MessageBoxW(0, "Ocorreu uma falha ao tentar gerar o novo resulado. IMPORTANTE: Feche os arquivos Word(.docx) abertos, após, tente novamente.", "Falha ao gerar arquivo", 1)
+        ctypes.windll.user32.MessageBoxW(0, f"Ocorreu uma falha. {erro}", "Falha ao gerar arquivo", 1)
+        raise
+    
+    time.sleep(1)
+    vGerou = False        
+    while not(vGerou):            
+        vGerou = os.path.isfile(arquivoDoc)
+        time.sleep(1)
+    
+    try:
+        convert(arquivoDoc, f"{vPathArquivo}{vNomeArquivo}.pdf")
+    except Exception as erro:
+        ctypes.windll.user32.MessageBoxW(0, f"Ocorreu uma falha ao converter. {erro}", "Falha ao converter arquivo", 1)
+
+    vGerou = False        
+    while not(vGerou):
+        vGerou = os.path.isfile(f"{vPathArquivo}{vNomeArquivo}.pdf")
+        time.sleep(1)
+            
+    if vGerou:
+        os.remove(arquivoDoc)
+        os.startfile(f"{vPathArquivo}{vNomeArquivo}.pdf")
+        os.startfile(vPathArquivo)
+                
+    #except Exception as erro:
+    #    ctypes.windll.user32.MessageBoxW(0, f"Ocorreu uma falha ao tentar gerar o novo resulado. IMPORTANTE: Feche os arquivos Word(.docx) abertos, após, tente novamente. {erro}", "Falha ao gerar arquivo", 1)
